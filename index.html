@@ -834,28 +834,10 @@
             <div class="card-header">
                 <span class="card-title">🤖 AI 智能建議</span>
                 <div style="display:flex;gap:8px;">
-                    <button class="btn btn-secondary btn-sm" onclick="toggleAIConfig()">⚙️ 配置</button>
                     <button class="btn btn-primary btn-sm" onclick="getAIAdvice()" id="aiBtn">✨ 獲取建議</button>
                 </div>
             </div>
-            <div id="aiConfig" style="display:none;">
-                <div class="ai-config" id="aiConfigForm">
-                    <label>API Key</label>
-                    <input type="password" id="aiApiKey" placeholder="sk-...">
-                    <label>API 地址（留空使用默認）</label>
-                    <input type="text" id="aiApiUrl" placeholder="https://api.deepseek.com/v1/chat/completions">
-                    <label>模型名稱</label>
-                    <input type="text" id="aiModel" placeholder="deepseek-chat">
-                    <button class="btn btn-primary btn-sm" onclick="saveAIConfig()" style="width:100%">💾 保存配置</button>
-                </div>
-                <div class="ai-config-status" id="aiConfigStatus" style="display:none;">
-                    <div style="text-align:center;padding:10px;">
-                        <div style="font-size:40px;margin-bottom:8px;">✅</div>
-                        <div style="font-weight:bold;font-size:16px;margin-bottom:6px;">API 已配置</div>
-                        <div style="color:var(--text-secondary);font-size:13px;">API 配置已鎖定，不可修改</div>
-                    </div>
-                </div>
-            </div>
+
             <div id="aiContent">
                 <div class="empty-state">
                     <div class="icon">🤖</div>
@@ -1161,7 +1143,7 @@
             if (!window.__cloudData[currentUserId]) {
                 window.__cloudData[currentUserId] = {
                     expenses: [], budgets: {default: {food:0,transport:0,shopping:0,entertainment:0,housing:0,medical:0,education:0,other:0}, monthly: {}},
-                    budgetHistory: [], chatHistory: [], aiConfig: {}, profile: {},
+                    budgetHistory: [], chatHistory: [], profile: {},
                     corrections: []
                 };
             }
@@ -1985,39 +1967,7 @@
 
         // ==================== AI 配置 ====================
         function getAIConfig() {
-            const ud = getCloudUserData();
-            if (ud && ud.aiConfig && ud.aiConfig.apiKey) return ud.aiConfig;
-            return { apiKey: 'sk-4bcf52454f5b4ab0b6c8514d85582d38', apiUrl: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-chat' };
-        }
-
-        function toggleAIConfig() {
-            const configDiv = document.getElementById('aiConfig');
-            const isVisible = configDiv.style.display !== 'none';
-            configDiv.style.display = isVisible ? 'none' : 'block';
-            if (!isVisible) {
-                const config = getAIConfig();
-                const hasConfig = config && config.apiKey;
-                document.getElementById('aiConfigForm').style.display = hasConfig ? 'none' : 'block';
-                document.getElementById('aiConfigStatus').style.display = hasConfig ? 'block' : 'none';
-                if (!hasConfig) {
-                    document.getElementById('aiApiKey').value = '';
-                    document.getElementById('aiApiUrl').value = '';
-                    document.getElementById('aiModel').value = '';
-                }
-            }
-        }
-
-        function saveAIConfig() {
-            const apiKey = document.getElementById('aiApiKey').value.trim();
-            const apiUrl = document.getElementById('aiApiUrl').value.trim() || 'https://api.deepseek.com/v1/chat/completions';
-            const model = document.getElementById('aiModel').value.trim() || 'deepseek-chat';
-            const ud = getCloudUserData();
-            if (ud) {
-                ud.aiConfig = { apiKey, apiUrl, model };
-                syncAfterMutation();
-            }
-            alert('配置已保存！');
-            toggleAIConfig();
+            return { apiKey: 'sk-a1e929205fc44e1d90ceda4ee1f80440', apiUrl: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-chat' };
         }
 
         
@@ -2041,7 +1991,7 @@ function verifyAdminPassword(pwd) {
 function computeDataChecksum() {
     try {
         const data = {};
-        const keys = ['costControl_data', 'costControl_budget_v2', 'costControl_budget_history', 'costControl_profile', 'costControl_chatHistory', 'costControl_aiConfig'];
+        const keys = ['costControl_data', 'costControl_budget_v2', 'costControl_budget_history', 'costControl_profile', 'costControl_chatHistory'];
         keys.forEach(k => {
             const v = localStorage.getItem(k);
             if (v) data[k] = v;
@@ -2119,7 +2069,7 @@ function triggerLock() {
     // 收集所有用戶數據做備份
     try {
         const backup = {};
-        const keys = ['costControl_data', 'costControl_budget_v2', 'costControl_budget_history', 'costControl_profile', 'costControl_chatHistory', 'costControl_aiConfig', '__cloudAccounts', '__cloudDeviceMap', '__cloudData', '__integrity'];
+        const keys = ['costControl_data', 'costControl_budget_v2', 'costControl_budget_history', 'costControl_profile', 'costControl_chatHistory', '__cloudAccounts', '__cloudDeviceMap', '__cloudData', '__integrity'];
         keys.forEach(k => {
             const v = localStorage.getItem(k);
             if (v) backup[k] = v;
