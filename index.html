@@ -786,7 +786,8 @@
                 </select>
                 <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
                 <button class="btn-refresh" onclick="refreshFromCloud()" title="從雲端重新載入">🔄</button>
-                <button class="btn btn-secondary btn-sm" onclick="setGithubTokenInteractive()" title="設定 GitHub Token">🔑</button>
+                <button class="btn btn-secondary btn-sm" onclick="setGithubTokenInteractive()" title="設定 Token">🔑</button>
+                <button class="btn btn-secondary btn-sm" onclick="clearGithubToken()" title="清除 Token" style="margin-left:4px">🗑️</button>
                 <span class="sync-status" id="syncStatus"></span>
                 <span id="learningBadge" style="font-size:11px;display:none;"></span>
             </div>
@@ -1295,6 +1296,11 @@
                 localStorage.setItem(GITHUB_TOKEN_KEY, t.trim());
                 showToast('✅ Token 已儲存，可正常同步雲端', 'success');
             }
+        }
+        function clearGithubToken() {
+            localStorage.removeItem(GITHUB_TOKEN_KEY);
+            updateSyncStatus('offline');
+            showToast('🗑️ Token 已清除，記賬將使用本機緩存', 'info');
         }
         let cloudSyncing = false;
         let lastCloudSync = 0;
