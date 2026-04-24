@@ -3157,7 +3157,7 @@ function checkLockOnBoot() {
                     </div>
                 </div>`;
             });
-            html += `<div style="display:flex;justify-content:space-between;padding:10px 0 4px;border-top:1px solid var(--border);font-size:13px;"><span>支出: <b style="color:var(--primary)">${fmt(totalExpense.toFixed(2)}</b></span><span>收入: <b style="color:var(--success)">+¥${totalIncome.toFixed(2)}</b></span></div>
+            html += `<div style="display:flex;justify-content:space-between;padding:10px 0 4px;border-top:1px solid var(--border);font-size:13px;"><span>支出: <b style="color:var(--primary)">${fmt(totalExpense.toFixed(2))}</b></span><span>收入: <b style="color:var(--success)">+¥${totalIncome.toFixed(2)}</b></span></div>
             <div class="screenshot-actions"><button class="btn btn-primary btn-sm" onclick="applyOcrResult()">✅ 勾選記賬</button><button class="btn btn-secondary btn-sm" onclick="removeScreenshot()">❌ 取消</button></div></div>`;
             resultDiv.innerHTML = html;
         }
