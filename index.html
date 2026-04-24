@@ -75,6 +75,18 @@
         }
         .btn-refresh:hover { transform: scale(1.1); }
         .btn-refresh.syncing { animation: spin 0.8s linear infinite; }
+        .currency-select {
+            appearance: none; -webkit-appearance: none;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 4px 8px;
+            font-size: 13px;
+            color: var(--text);
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .currency-select:hover { border-color: var(--primary); }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         .sync-status {
@@ -768,9 +780,9 @@
                 <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importFile').click()">📤 導入</button>
                 <input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(this)">
                 <select class="currency-select" id="currencySelect" onchange="setCurrency(this.value)">
-                    <option value="MOP">MOP$</option>
-                    <option value="RMB">¥</option>
-                    <option value="USD">US$</option>
+                    <option value="MOP">🇲🇴 MOP</option>
+                    <option value="CNY">🇨🇳 CNY</option>
+                    <option value="USD">🇺🇸 USD</option>
                 </select>
                 <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
                 <button class="btn-refresh" onclick="refreshFromCloud()" title="從雲端重新載入">🔄</button>
@@ -1272,15 +1284,17 @@
         }
         let cloudSyncing = false;
         let lastCloudSync = 0;
-        // ==================== 货币系统 (MOP/RMB/USD) ====================
+        // ==================== 货币系统 (MOP/CNY/USD) ====================
         const CURRENCIES = {
             MOP: { symbol: 'MOP$', rate: 1, name: '澳门元' },
-            RMB: { symbol: '¥', rate: 0.935, name: '人民币' },
+            CNY: { symbol: '¥', rate: 0.935, name: '人民币' },
             USD: { symbol: 'US$', rate: 0.124, name: '美元' }
         };
         let currentCurrency = 'MOP';
         function getCurrency() {
-            const saved = localStorage.getItem('costControl_currency');
+            let saved = localStorage.getItem('costControl_currency');
+            // 兼容舊版 RMB → CNY
+            if (saved === 'RMB') { saved = 'CNY'; localStorage.setItem('costControl_currency', 'CNY'); }
             if (saved && CURRENCIES[saved]) currentCurrency = saved;
             return currentCurrency;
         }
