@@ -786,6 +786,7 @@
                 </select>
                 <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
                 <button class="btn-refresh" onclick="refreshFromCloud()" title="從雲端重新載入">🔄</button>
+                <button class="btn btn-secondary btn-sm" onclick="setGithubTokenInteractive()" title="設定 GitHub Token">🔑</button>
                 <span class="sync-status" id="syncStatus"></span>
                 <span id="learningBadge" style="font-size:11px;display:none;"></span>
             </div>
@@ -1282,6 +1283,19 @@
             }
             return t || '';
         }
+        function setGithubTokenInteractive() {
+            const old = localStorage.getItem(GITHUB_TOKEN_KEY);
+            const msg = old ? '當前已有 Token（末10位: ...'+old.slice(-10)+'）\n要更換嗎？輸入新 Token 即可覆蓋，留空則清除：' : '請輸入 GitHub Token：';
+            const t = prompt(msg);
+            if (t === null) return;
+            if (!t.trim()) {
+                localStorage.removeItem(GITHUB_TOKEN_KEY);
+                showToast('已清除 Token，記賬將僅存於本機', 'info');
+            } else {
+                localStorage.setItem(GITHUB_TOKEN_KEY, t.trim());
+                showToast('✅ Token 已儲存，可正常同步雲端', 'success');
+            }
+        }
         let cloudSyncing = false;
         let lastCloudSync = 0;
         // ==================== 货币系统 (MOP/CNY/USD) ====================
@@ -1347,13 +1361,8 @@
             try {
                 const cd = await fetchGistData();
                 if (cd === null || cd === undefined) {
-                    // 真正網路失敗
-                    window.__cloudData = null;
-                    window.__cloudAccounts = null;
-                    window.__cloudDeviceMap = null;
-                    return;
+                    throw new Error('空響應');
                 }
-                // Gist 返回成功（可能為空）
                 window.__cloudAccounts = cd.accounts || {};
                 window.__cloudDeviceMap = cd.deviceMap || {};
                 window.__cloudData = cd.userData || {};
@@ -1362,12 +1371,41 @@
                 updateSyncStatus('synced');
                 console.log('✅ 雲端同步完成');
             } catch (e) {
-                window.__cloudData = null;
-                window.__cloudAccounts = null;
-                window.__cloudDeviceMap = null;
-                updateSyncStatus('offline');
                 console.warn('⚠️ 雲端讀取失敗:', e.message);
+                // 嘗試從本機緩存恢復
+                const cache = loadLocalCacheRaw();
+                if (cache) {
+                    window.__cloudData = cache.userData || {};
+                    window.__cloudAccounts = cache.accounts || {};
+                    window.__cloudDeviceMap = cache.deviceMap || {};
+                    updateSyncStatus('offline');
+                    console.log('✅ 從本機緩存恢復');
+                } else {
+                    window.__cloudData = null;
+                    window.__cloudAccounts = null;
+                    window.__cloudDeviceMap = null;
+                    updateSyncStatus('offline');
+                }
             }
+        }
+        const CACHE_KEY_PREFIX = 'costControl_cache_';
+        function loadLocalCacheRaw() {
+            try {
+                const raw = localStorage.getItem(CACHE_KEY_PREFIX + '_cloud_snapshot');
+                return raw ? JSON.parse(raw) : null;
+            } catch(e) { return null; }
+        }
+        function saveLocalCache() {
+            if (!currentUserId) return;
+            // 存用戶數據
+            const ud = window.__cloudData?.[currentUserId];
+            if (ud) localStorage.setItem(CACHE_KEY_PREFIX + currentUserId, JSON.stringify(ud));
+            // 存全局快照
+            localStorage.setItem(CACHE_KEY_PREFIX + '_cloud_snapshot', JSON.stringify({
+                accounts: window.__cloudAccounts || {},
+                deviceMap: window.__cloudDeviceMap || {},
+                userData: window.__cloudData || {}
+            }));
         }
 
         // 將記憶體中的雲端數據推送到 Gist
@@ -1375,6 +1413,8 @@
             if (cloudSyncing) { console.log('⏳ 已有同步進行中'); return; }
             cloudSyncing = true;
             updateSyncStatus('syncing');
+            // 先存本機緩存（確保數據不丟失）
+            saveLocalCache();
             try {
                 await pushGistData({
                     accounts: window.__cloudAccounts || {},
@@ -1385,7 +1425,7 @@
                 console.log('✅ 雲端已同步');
             } catch (e) {
                 updateSyncStatus('error');
-                console.warn('⚠️ 雲端寫入失敗:', e.message);
+                console.warn('⚠️ 雲端寫入失敗（本機已備份）:', e.message);
             } finally {
                 cloudSyncing = false;
             }
@@ -2246,9 +2286,9 @@ function checkLockOnBoot() {
             if (ud && ud.budgetHistory) budgetHistory = ud.budgetHistory;
         }
 
-        function saveData() { const ud = getCloudUserData(); if (ud) ud.expenses = expenses; syncAfterMutation(); }
-        function saveBudgets() { const ud = getCloudUserData(); if (ud) ud.budgets = budgetData; syncAfterMutation(); }
-        function saveBudgetHistory() { const ud = getCloudUserData(); if (ud) ud.budgetHistory = budgetHistory; syncAfterMutation(); }
+        function saveData() { const ud = getCloudUserData(); if (ud) ud.expenses = expenses; saveLocalCache(); syncAfterMutation(); }
+        function saveBudgets() { const ud = getCloudUserData(); if (ud) ud.budgets = budgetData; saveLocalCache(); syncAfterMutation(); }
+        function saveBudgetHistory() { const ud = getCloudUserData(); if (ud) ud.budgetHistory = budgetHistory; saveLocalCache(); syncAfterMutation(); }
 
         function formatDate(date) {
             const d = new Date(date);
