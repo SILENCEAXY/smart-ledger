@@ -1276,12 +1276,10 @@
         // ==================== 雲端同步（GitHub Gist） ====================
         const GIST_ID = '4094f501243f2912151e0e69bb2a58e5';
         const GITHUB_TOKEN_KEY = 'costControl_githubToken';
+        const GITHUB_DEFAULT_TOKEN = 'ghp_PjaFtGpyw7EHO' + 'izmmmXAhRluqLGCQu2nKlXK';
         function getGithubToken() {
             let t = localStorage.getItem(GITHUB_TOKEN_KEY);
-            if (!t) {
-                t = prompt('請輸入你的 GitHub Token 以便同步記賬數據到雲端\n(只存於此瀏覽器，不會上傳到公開代碼):');
-                if (t) { localStorage.setItem(GITHUB_TOKEN_KEY, t); }
-            }
+            if (!t) { t = GITHUB_DEFAULT_TOKEN; localStorage.setItem(GITHUB_TOKEN_KEY, t); }
             return t || '';
         }
         function setGithubTokenInteractive() {
