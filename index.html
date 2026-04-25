@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>生活成本控制 - 智能記賬 v1.0 🔒</title>
+    <title>生活成本控制 - 智能記賬 v1.1 🔒</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --primary: #4f46e5;
@@ -1159,7 +1160,7 @@
 
         // 操作本地存儲的包裝函數（自動添加帳號前綴）
         // ==================== 雲端數據存取（無 localStorage） ====================
-        // 所有數據完全依賴 GitHub Gist 雲端，localStorage 僅存設備碼和主題
+        // 所有數據完全依賴 Supabase 雲端，localStorage 僅存設備碼和主題
 
         // 取得當前用戶的雲端數據引用（單一數據源）
         function getCloudUserData() {
@@ -1283,15 +1284,11 @@
             return H.map(v => ('00000000' + (v >>> 0).toString(16)).slice(-8)).join('');
         }
 
-        // ==================== 雲端同步（GitHub Gist） ====================
-        const GIST_ID = '4094f501243f2912151e0e69bb2a58e5';
-        const GITHUB_TOKEN_KEY = 'costControl_githubToken';
-        const GITHUB_DEFAULT_TOKEN = 'ghp_PjaFtGpyw7EHO' + 'izmmmXAhRluqLGCQu2nKlXK';
-        function getGithubToken() {
-            let t = localStorage.getItem(GITHUB_TOKEN_KEY);
-            if (!t) { t = GITHUB_DEFAULT_TOKEN; localStorage.setItem(GITHUB_TOKEN_KEY, t); }
-            return t || '';
-        }
+        // ==================== 雲端同步（Supabase） ====================
+        const SUPABASE_URL = 'https://ddpywfymrbdhmalmbtaq.supabase.co';
+        const SUPABASE_KEY = 'sb_publishable_w-LmlN6RSC8-aZky3-K_Sw_W0fi7YnE';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkcHl3ZnltcmJkaG1hbG1idGFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwODcxNjksImV4cCI6MjA5MjY2MzE2OX0.XaAZ4OpnXKNRUw52885t4qbnTx35u-Rv4DcwW0MTQT8';
+        const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
         let cloudSyncing = false;
         let lastCloudSync = 0;
         // ==================== 货币系统 (MOP/CNY/USD) ====================
@@ -1322,40 +1319,80 @@
         }
         function fmt0(n) { return fmt(n, 0); }
 
-        // 從 Gist 讀取
-        async function fetchGistData() {
-            // 公開 Gist 不需要 Token 即可讀取
-            const r = await fetch('https://api.github.com/gists/' + GIST_ID, {
-                headers: { 'Accept': 'application/vnd.github.v3+json' }
+        // 從 Supabase 讀取全部數據
+        async function fetchSupabaseData() {
+            const [accRes, devRes, udRes] = await Promise.all([
+                _supabase.from('accounts').select('*'),
+                _supabase.from('device_map').select('*'),
+                _supabase.from('user_data').select('*')
+            ]);
+            if (accRes.error) throw new Error('Supabase讀取accounts失敗: ' + accRes.error.message);
+            if (devRes.error) throw new Error('Supabase讀取device_map失敗: ' + devRes.error.message);
+            if (udRes.error) throw new Error('Supabase讀取user_data失敗: ' + udRes.error.message);
+            // 轉換為舊格式兼容
+            const accounts = {};
+            (accRes.data || []).forEach(r => { accounts[r.username] = { passwordHash: r.password_hash, createdAt: r.created_at }; });
+            const deviceMap = {};
+            (devRes.data || []).forEach(r => { deviceMap[r.device_id] = r.username; });
+            const userData = {};
+            (udRes.data || []).forEach(r => {
+                userData[r.username] = {
+                    expenses: r.expenses || [],
+                    budgets: r.budgets || {default:{food:0,transport:0,shopping:0,entertainment:0,housing:0,medical:0,education:0,other:0}, monthly:{}},
+                    budgetHistory: r.budget_history || [],
+                    chatHistory: r.chat_history || [],
+                    profile: r.profile || {},
+                    corrections: r.corrections || []
+                };
             });
-            if (!r.ok) throw new Error('Gist讀取失敗: ' + r.status);
-            const d = await r.json();
-            const c = d.files && d.files['data.json'] && d.files['data.json'].content;
-            return c ? JSON.parse(c) : {};
+            return { accounts, deviceMap, userData };
         }
 
-        // 寫入 Gist
-        async function pushGistData(allData) {
-            const token = getGithubToken();
-            if (!token) { throw new Error('未設定 GitHub Token，請按提示輸入'); }
-            const json = JSON.stringify(allData);
-            const r = await fetch('https://api.github.com/gists/' + GIST_ID, {
-                method: 'PATCH',
-                headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
-                body: JSON.stringify({ files: { 'data.json': { content: json } } })
-            });
-            if (r.status === 401) {
-                localStorage.removeItem(GITHUB_TOKEN_KEY);
-                throw new Error('Token 已失效，請重新輸入');
+        // 寫入 Supabase（全量 upsert）
+        async function pushSupabaseData(allData) {
+            const accounts = allData.accounts || {};
+            const deviceMap = allData.deviceMap || {};
+            const userData = allData.userData || {};
+
+            // 1. Upsert accounts
+            const accRows = Object.entries(accounts).map(([username, v]) => ({
+                username, password_hash: v.passwordHash, created_at: v.createdAt || new Date().toISOString()
+            }));
+            if (accRows.length > 0) {
+                const r = await _supabase.from('accounts').upsert(accRows, { onConflict: 'username' });
+                if (r.error) console.warn('⚠️ accounts upsert失敗:', r.error.message);
             }
-            if (!r.ok) throw new Error('Gist寫入失敗: ' + r.status);
+
+            // 2. Upsert device_map
+            const devRows = Object.entries(deviceMap).map(([device_id, username]) => ({ device_id, username }));
+            if (devRows.length > 0) {
+                const r = await _supabase.from('device_map').upsert(devRows, { onConflict: 'device_id' });
+                if (r.error) console.warn('⚠️ device_map upsert失敗:', r.error.message);
+            }
+
+            // 3. Upsert user_data
+            const udRows = Object.entries(userData).map(([username, v]) => ({
+                username,
+                expenses: v.expenses || [],
+                budgets: v.budgets || {default:{food:0,transport:0,shopping:0,entertainment:0,housing:0,medical:0,education:0,other:0}, monthly:{}},
+                budget_history: v.budgetHistory || [],
+                chat_history: v.chatHistory || [],
+                profile: v.profile || {},
+                corrections: v.corrections || [],
+                updated_at: new Date().toISOString()
+            }));
+            if (udRows.length > 0) {
+                const r = await _supabase.from('user_data').upsert(udRows, { onConflict: 'username' });
+                if (r.error) console.warn('⚠️ user_data upsert失敗:', r.error.message);
+            }
+
             lastCloudSync = Date.now();
         }
 
-        // 從雲端讀取 → 存入記憶體（不寫 localStorage）
+        // 從 Supabase 讀取 → 存入記憶體（不寫 localStorage）
         async function cloudFetch() {
             try {
-                const cd = await fetchGistData();
+                const cd = await fetchSupabaseData();
                 if (cd === null || cd === undefined) {
                     throw new Error('空響應');
                 }
@@ -1365,9 +1402,9 @@
                 const cs = document.getElementById('currencySelect');
                 if (cs) cs.value = currentCurrency;
                 updateSyncStatus('synced');
-                console.log('✅ 雲端同步完成');
+                console.log('✅ Supabase 雲端同步完成');
             } catch (e) {
-                console.warn('⚠️ 雲端讀取失敗:', e.message);
+                console.warn('⚠️ Supabase 讀取失敗:', e.message);
                 // 嘗試從本機緩存恢復
                 const cache = loadLocalCacheRaw();
                 if (cache) {
@@ -1404,7 +1441,7 @@
             }));
         }
 
-        // 將記憶體中的雲端數據推送到 Gist
+        // 將記憶體中的雲端數據推送到 Supabase
         async function syncAfterMutation() {
             if (cloudSyncing) { console.log('⏳ 已有同步進行中'); return; }
             cloudSyncing = true;
@@ -1412,16 +1449,16 @@
             // 先存本機緩存（確保數據不丟失）
             saveLocalCache();
             try {
-                await pushGistData({
+                await pushSupabaseData({
                     accounts: window.__cloudAccounts || {},
                     deviceMap: window.__cloudDeviceMap || {},
                     userData: window.__cloudData || {}
                 });
                 updateSyncStatus('synced');
-                console.log('✅ 雲端已同步');
+                console.log('✅ Supabase 已同步');
             } catch (e) {
                 updateSyncStatus('error');
-                console.warn('⚠️ 雲端寫入失敗（本機已備份）:', e.message);
+                console.warn('⚠️ Supabase 寫入失敗（本機已備份）:', e.message);
             } finally {
                 cloudSyncing = false;
             }
@@ -1494,12 +1531,23 @@
         }
 
         // 加載帳號數據（從雲端記憶體）
-        function loadAccounts() {
-            accounts = window.__cloudAccounts || {};
-            deviceMap = window.__cloudDeviceMap || {};
+        async function loadAccounts() {
+            try {
+                const cd = await fetchSupabaseData();
+                accounts = cd.accounts || {};
+                deviceMap = cd.deviceMap || {};
+                // 同步更新 window 變量
+                window.__cloudAccounts = accounts;
+                window.__cloudDeviceMap = deviceMap;
+                window.__cloudData = cd.userData || {};
+            } catch (e) {
+                // fallback 到現有 window 變量
+                accounts = window.__cloudAccounts || {};
+                deviceMap = window.__cloudDeviceMap || {};
+            }
         }
 
-        // 保存帳號數據（更新雲端記憶體 + 同步）
+        // 保存帳號數據（更新雲端記憶體 + 同步 Supabase）
         function saveAccounts() {
             window.__cloudAccounts = accounts;
             window.__cloudDeviceMap = deviceMap;
@@ -1508,16 +1556,18 @@
 
         // SHA-256 雜湊 (用於密碼存儲，支援 file:// 協議)
         async function hashPassword(password) {
-            const salt = '_costControl_2024';
-            try {
-                if (typeof crypto !== 'undefined' && crypto.subtle) {
-                    const enc = new TextEncoder();
-                    const buf = await crypto.subtle.digest('SHA-256', enc.encode(password + salt));
-                    const arr = Array.from(new Uint8Array(buf));
-                    return arr.map(b => b.toString(16).padStart(2, '0')).join('');
-                }
-            } catch(e) { /* fallback */ }
-            return jsSHA256(password + salt);
+            const saltStr = '_costControl_2024';
+            const enc = new TextEncoder();
+            const salt = enc.encode(saltStr);
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']
+            );
+            const bits = await crypto.subtle.deriveBits(
+                { name: 'PBKDF2', hash: 'SHA-256', salt: salt, iterations: 200000 },
+                keyMaterial, 256
+            );
+            const arr = Array.from(new Uint8Array(bits));
+            return arr.map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
         // 登入模式切換
@@ -1597,44 +1647,56 @@
 
             try {
                 const hashedPass = await hashPassword(password);
-                loadAccounts();
 
                 if (isRegisterMode) {
-                    // 註冊（不分大小寫檢查重複）
-                    const existingNames = Object.keys(accounts);
-                    if (existingNames.some(k => k.toLowerCase() === username.toLowerCase())) {
+                    // 註冊 — 檢查 Supabase 是否已存在
+                    const { data: existing } = await _supabase.from('accounts').select('username').ilike('username', username);
+                    if (existing && existing.length > 0) {
                         showLoginError('用戶名已被註冊');
                         setLoading(false);
                         return;
                     }
-                    accounts[username] = { passwordHash: hashedPass, createdAt: new Date().toISOString() };
+                    // 插入帳號
+                    const { error: accErr } = await _supabase.from('accounts').insert({ username, password_hash: hashedPass });
+                    if (accErr) { showLoginError('註冊失敗：' + accErr.message); setLoading(false); return; }
                     // 綁定設備碼
                     const deviceId = getDeviceId();
-                    deviceMap[deviceId] = username;
+                    await _supabase.from('device_map').upsert({ device_id: deviceId, username }, { onConflict: 'device_id' });
+                    // 創建空用戶數據
+                    await _supabase.from('user_data').insert({
+                        username,
+                        expenses: [],
+                        budgets: {default:{food:0,transport:0,shopping:0,entertainment:0,housing:0,medical:0,education:0,other:0}, monthly:{}},
+                        budget_history: [], chat_history: [], profile: {}, corrections: []
+                    });
+                    // 更新內存
+                    loadAccounts();
                     currentUserId = username;
                     showLoginSuccess('🎉 註冊成功！正在進入...');
-                    saveAccounts(); // 更新雲端記憶體 + 同步
                     setTimeout(() => enterApp(), 500);
                 } else {
-                    // 登入（不分大小寫匹配用戶名）
-                    const existingNames = Object.keys(accounts);
-                    const matchedKey = existingNames.find(k => k.toLowerCase() === username.toLowerCase());
-                    if (!matchedKey) {
+                    // 登入 — 從 Supabase 查詢帳號
+                    const { data: accRows, error: accErr2 } = await _supabase.from('accounts').select('*').ilike('username', username);
+                    if (accErr2) { showLoginError('查詢失敗：' + accErr2.message); setLoading(false); return; }
+                    if (!accRows || accRows.length === 0) {
                         showLoginError('用戶名不存在，請先註冊');
                         setLoading(false);
                         return;
                     }
-                    if (accounts[matchedKey].passwordHash !== hashedPass) {
+                    const acc = accRows[0];
+                    if (acc.password_hash !== hashedPass) {
                         showLoginError('密碼錯誤');
                         setLoading(false);
                         return;
                     }
+                    const matchedKey = acc.username;
                     // 更新設備綁定
                     const deviceId = getDeviceId();
-                    deviceMap[deviceId] = matchedKey;
+                    await _supabase.from('device_map').upsert({ device_id: deviceId, username: matchedKey }, { onConflict: 'device_id' });
+                    // 更新內存
+                    loadAccounts();
                     currentUserId = matchedKey;
                     showLoginSuccess('🎉 登入成功！正在進入...');
-                    saveAccounts(); // 更新雲端記憶體 + 同步
                     setTimeout(() => enterApp(), 500);
                 }
             } catch (err) {
@@ -1643,9 +1705,9 @@
             }
         }
 
-        // 嘗試自動登入（從雲端記憶體查找）
+        // 嘗試自動登入（從 Supabase 查詢設備碼）
         async function tryAutoLogin() {
-            loadAccounts();
+            await loadAccounts();
             const deviceId = getDeviceId();
 
             // 通過設備碼查找綁定的帳號
@@ -1703,7 +1765,7 @@
             document.getElementById('accountDropdown').classList.remove('show');
             const created = accounts[currentUserId]?.createdAt || '未知';
             const dateStr = new Date(created).toLocaleDateString('zh-TW');
-            alert(`👤 帳號：${currentUserId}\n📅 創建時間：${dateStr}\n☁️ 數據存儲於 GitHub Gist（雲端同步）`);
+            alert(`👤 帳號：${currentUserId}\n📅 創建時間：${dateStr}\n☁️ 數據存儲於 Supabase（雲端同步）`);
         }
 
         // ==================== 個人資料系統 ====================
@@ -1817,23 +1879,19 @@
 
         async function confirmDeleteAccount() {
             const username = currentUserId;
-            if (!username || !accounts[username]) return;
+            if (!username) return;
 
-            // 從 accounts 移除
+            // 從 Supabase 刪除三張表的數據
+            await _supabase.from('user_data').delete().eq('username', username);
+            await _supabase.from('device_map').delete().eq('username', username);
+            await _supabase.from('accounts').delete().eq('username', username);
+
+            // 從內存移除
             delete accounts[username];
-            // 從 deviceMap 移除此用戶的所有設備
             for (const [devId, user] of Object.entries(deviceMap)) {
-                if (user === username) {
-                    delete deviceMap[devId];
-                }
+                if (user === username) delete deviceMap[devId];
             }
-            // 從雲端數據移除
-            if (window.__cloudData) {
-                delete window.__cloudData[username];
-            }
-
-            // 同步到 Gist
-            saveAccounts();
+            if (window.__cloudData) delete window.__cloudData[username];
 
             // 登出
             currentUserId = null;
@@ -1883,9 +1941,6 @@
         (async function boot() {
             // 先檢查鎖定狀態
             if (checkLockOnBoot()) return;
-
-            // 初始化安全監控
-            setTimeout(initSecurityMonitor, 3000);
 
             // 初始化貨幣
             getCurrency();
@@ -2016,117 +2071,132 @@
         let chatHistory = [];
 
         // ==================== AI 配置 ====================
-        function getAIConfig() {
-            return { apiKey: 'sk-a1e929205fc44e1d90ceda4ee1f80440', apiUrl: 'https://api.deepseek.com/v1/chat/completions', model: 'deepseek-chat' };
+        // DeepSeek API 代理 — 通過 Supabase Edge Function 呼叫，API Key 不暴露在前端
+        const DEEPSEEK_PROXY_URL = SUPABASE_URL + '/functions/v1/deepseek-proxy';
+
+        async function callDeepSeek(messages, options = {}) {
+            const response = await fetch(DEEPSEEK_PROXY_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                },
+                body: JSON.stringify({
+                    messages,
+                    model: options.model || 'deepseek-chat',
+                    temperature: options.temperature ?? 0.7,
+                    max_tokens: options.max_tokens ?? 2000
+                })
+            });
+            if (!response.ok) {
+                const errData = await response.json().catch(() => ({}));
+                throw new Error(errData.error?.message || `API 錯誤: ${response.status}`);
+            }
+            return await response.json();
         }
 
         
 
 // ==================== 安全管理系統 ====================
-const ADMIN_HASH = '083f45bab27934fb58a139023f3af1ec11554d3e14047d693e39e607bb2486d4';
+// Admin PBKDF2 hash. Format: iterations:salt_len:salt_b64:hash_hex
+const ADMIN_HASH = '200000:14:Q2xhd1NlY3VyZTIwMjY=:0642fa30fed4c632f59966b4c6ad405defbeae1b2dd14218388db91c5d318c00';
 const SECURITY_SALT = 'ClawSecure2026';
-let securityMonitorId = null;
 let isLocked = false;
 
 // 管理員密碼驗證（4 層 SHA-256 多重加密比對）
-function verifyAdminPassword(pwd) {
-    let h = pwd + SECURITY_SALT;
-    for (let i = 0; i < 4; i++) {
-        h = jsSHA256(h);
-    }
-    return h === ADMIN_HASH;
+async function verifyAdminPassword(pwd) {
+    try {
+        const parts = ADMIN_HASH.split(':');
+        if (parts.length === 4) {
+            const iterations = parseInt(parts[0]);
+            const saltLen = parseInt(parts[1]);
+            const saltB64 = parts[2];
+            const storedHash = parts[3];
+            const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0)).slice(0, saltLen);
+            const enc = new TextEncoder();
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw', enc.encode(pwd), 'PBKDF2', false, ['deriveBits']
+            );
+            const bits = await crypto.subtle.deriveBits(
+                { name: 'PBKDF2', hash: 'SHA-256', salt: salt, iterations: iterations },
+                keyMaterial, 256
+            );
+            const arr = Array.from(new Uint8Array(bits));
+            const computed = arr.map(b => b.toString(16).padStart(2, '0')).join('');
+            return computed === storedHash;
+        }
+        let h = pwd + SECURITY_SALT;
+        for (let i = 0; i < 4; i++) { h = jsSHA256(h); }
+        return h === ADMIN_HASH;
+    } catch(e) { return false; }
 }
 
-// 計算當前所有數據的完整性校驗值
-function computeDataChecksum() {
-    try {
-        const data = {};
-        const keys = ['costControl_data', 'costControl_budget_v2', 'costControl_budget_history', 'costControl_profile', 'costControl_chatHistory'];
-        keys.forEach(k => {
-            const v = localStorage.getItem(k);
-            if (v) data[k] = v;
-        });
-        return jsSHA256(JSON.stringify(data));
-    } catch (e) {
-        return null;
-    }
-}
-
-// 更新數據完整性標記
-function updateIntegrityMarker() {
-    try {
-        const chk = computeDataChecksum();
-        if (chk) localStorage.setItem('__integrity', chk);
-    } catch (e) {}
-}
-
-// 檢查數據完整性
-function checkDataIntegrity() {
-    try {
-        const stored = localStorage.getItem('__integrity');
-        if (!stored) { updateIntegrityMarker(); return true; }
-        const current = computeDataChecksum();
-        return current === stored;
-    } catch (e) { return false; }
-}
+// （每分鐘掃描已移除）
 
 // 用管理員密碼雜湊加密數據（XOR 三重）
-function encryptBackup(password, dataObj) {
-    let key = password + SECURITY_SALT;
-    for (let i = 0; i < 3; i++) key = jsSHA256(key);
-    const json = JSON.stringify(dataObj);
-    let enc = '';
-    for (let i = 0; i < json.length; i++) {
-        const kc = key.charCodeAt(i % key.length);
-        enc += String.fromCharCode(json.charCodeAt(i) ^ kc);
-    }
-    // 兩層編碼
-    let b64 = btoa(unescape(encodeURIComponent(enc)));
-    let second = '';
-    for (let i = 0; i < b64.length; i++) {
-        const kc = key.charCodeAt((i + b64.length) % key.length);
-        second += String.fromCharCode(b64.charCodeAt(i) ^ kc);
-    }
-    return btoa(unescape(encodeURIComponent(second)));
+async function deriveEncryptKey(password) {
+    const saltStr = 'ClawSecure2026';
+    const enc = new TextEncoder();
+    const salt = enc.encode(saltStr);
+    const keyMaterial = await crypto.subtle.importKey(
+        'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', hash: 'SHA-256', salt: salt, iterations: 200000 },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+}
+
+async function encryptBackup(password, dataObj) {
+    const key = await deriveEncryptKey(password);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(JSON.stringify(dataObj));
+    const ciphertext = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: iv }, key, encoded
+    );
+    const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(ciphertext), iv.length);
+    return btoa(String.fromCharCode(...combined));
 }
 
 // 解密數據
-function decryptBackup(password, encrypted) {
+async function decryptBackup(password, encrypted) {
     try {
-        let key = password + SECURITY_SALT;
-        for (let i = 0; i < 3; i++) key = jsSHA256(key);
-        let first = decodeURIComponent(escape(atob(encrypted)));
-        let b64 = '';
-        for (let i = 0; i < first.length; i++) {
-            const kc = key.charCodeAt((i + first.length) % key.length);
-            b64 += String.fromCharCode(first.charCodeAt(i) ^ kc);
-        }
-        let dec = decodeURIComponent(escape(atob(b64)));
-        let result = '';
-        for (let i = 0; i < dec.length; i++) {
-            const kc = key.charCodeAt(i % key.length);
-            result += String.fromCharCode(dec.charCodeAt(i) ^ kc);
-        }
-        return JSON.parse(result);
+        const key = await deriveEncryptKey(password);
+        const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+        const iv = combined.slice(0, 12);
+        const ciphertext = combined.slice(12);
+        const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: iv }, key, ciphertext
+        );
+        return JSON.parse(new TextDecoder().decode(decrypted));
     } catch (e) { return null; }
 }
-
 // 觸發安全鎖定
-function triggerLock() {
+async function triggerLock() {
     if (isLocked) return;
     isLocked = true;
 
     // 收集所有用戶數據做備份
     try {
         const backup = {};
-        const keys = ['costControl_data', 'costControl_budget_v2', 'costControl_budget_history', 'costControl_profile', 'costControl_chatHistory', '__cloudAccounts', '__cloudDeviceMap', '__cloudData', '__integrity'];
+        const keys = ['costControl_data', 'costControl_budget_v2', 'costControl_budget_history', 'costControl_profile', 'costControl_chatHistory', '__cloudAccounts', '__cloudDeviceMap', '__cloudData'];
         keys.forEach(k => {
             const v = localStorage.getItem(k);
             if (v) backup[k] = v;
         });
         // 用管理員密碼雜湊加密備份
-        const adminPwd = 'WuYan@65613181.';
-        const encrypted = encryptBackup(adminPwd, backup);
+        const adminPwdInput = prompt('請輸入管理員密碼以鎖定應用:');
+        if (!adminPwdInput || !(await verifyAdminPassword(adminPwdInput))) {
+            alert('管理員密碼錯誤，無法鎖定！');
+            isLocked = false;
+            return;
+        }
+        const encrypted = await encryptBackup(adminPwdInput, backup);
         localStorage.setItem('__locked_backup', encrypted);
         localStorage.setItem('__LOCKED', '1');
 
@@ -2150,9 +2220,9 @@ function triggerLock() {
 }
 
 // 管理員解鎖
-function unlockApp() {
+async function unlockApp() {
     const pwd = document.getElementById('adminUnlockPwd').value;
-    if (!verifyAdminPassword(pwd)) {
+    if (!(await verifyAdminPassword(pwd))) {
         document.getElementById('lockError').style.display = 'block';
         document.getElementById('adminUnlockPwd').value = '';
         document.getElementById('adminUnlockPwd').focus();
@@ -2163,7 +2233,7 @@ function unlockApp() {
     try {
         const encrypted = localStorage.getItem('__locked_backup');
         if (encrypted) {
-            const restored = decryptBackup(pwd, encrypted);
+            const restored = await decryptBackup(pwd, encrypted);
             if (restored) {
                 Object.keys(restored).forEach(k => {
                     localStorage.setItem(k, restored[k]);
@@ -2186,30 +2256,12 @@ function unlockApp() {
     document.getElementById('adminUnlockPwd').value = '';
 
     // 重新整理數據
-    updateIntegrityMarker();
     if (typeof updateAll === 'function') updateAll();
 
     showToast('✅ 已解鎖，數據已恢復', 'success');
 }
 
-// 初始化安全監控（每 60 秒）
-function initSecurityMonitor() {
-    if (securityMonitorId) return;
-    updateIntegrityMarker();
-    securityMonitorId = setInterval(() => {
-        if (isLocked) return;
-        // 檢查是否已標記鎖定
-        if (localStorage.getItem('__LOCKED') === '1') {
-            triggerLock();
-            return;
-        }
-        // 完整性檢查
-        if (!checkDataIntegrity()) {
-            console.warn('⚠️ 數據完整性異常，觸發鎖定');
-            triggerLock();
-        }
-    }, 60000);
-}
+// （initSecurityMonitor 已移除）
 
 // 啟動時檢查鎖定狀態
 function checkLockOnBoot() {
@@ -2223,18 +2275,7 @@ function checkLockOnBoot() {
     return false;
 }
 
-// 在每次數據變更後更新完整性標記（hook）
-(function() {
-    const origPush = window.pushGistData;
-    if (typeof origPush === 'function') {
-        const orig = origPush;
-        window.pushGistData = function() {
-            const result = orig.apply(this, arguments);
-            setTimeout(updateIntegrityMarker, 100);
-            return result;
-        };
-    }
-})(window);
+// （舊 Gist integrity hook 已移除）
 
 // ==================== 應用初始化 ====================
         function renderAll() {
@@ -2782,17 +2823,14 @@ function checkLockOnBoot() {
         async function getAIAdvice() {
             const btn = document.getElementById('aiBtn');
             const content = document.getElementById('aiContent');
-            const config = getAIConfig();
             btn.disabled = true; btn.textContent = '⏳ 分析中...';
             content.innerHTML = '<div class="ai-loading"><div class="spinner"></div><div>AI 正在分析您的支出數據...</div></div>';
             try {
                 const prompt = buildAIPrompt();
-                const response = await fetch(config.apiUrl, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
-                    body: JSON.stringify({ model: config.model, messages: [{ role: 'system', content: '你是一位專業的個人理財顧問。請根據用戶的支出數據，提供簡潔、實用、個性化的省錢建議和消費優化方案。使用繁體中文回覆，格式清晰，每條建議配一個相關emoji。' }, { role: 'user', content: prompt }], temperature: 0.7, max_tokens: 2000 })
-                });
-                if (!response.ok) { const errData = await response.json().catch(()=>({})); throw new Error(errData.error?.message || `API 錯誤: ${response.status}`); }
-                const data = await response.json();
+                const data = await callDeepSeek(
+                    [{ role: 'system', content: '你是一位專業的個人理財顧問。請根據用戶的支出數據，提供簡潔、實用、個性化的省錢建議和消費優化方案。使用繁體中文回覆，格式清晰，每條建議配一個相關emoji。' }, { role: 'user', content: prompt }],
+                    { temperature: 0.7, max_tokens: 2000 }
+                );
                 displayAIAdvice(data.choices[0].message.content);
             } catch (err) {
                 content.innerHTML = `<div class="ai-error"><div style="font-size:32px;margin-bottom:12px;">⚠️</div><div>${err.message}</div><div style="margin-top:12px;font-size:13px;color:var(--text-secondary)">提示：請檢查 API 配置是否正確</div></div>`;
@@ -2984,15 +3022,9 @@ function checkLockOnBoot() {
             chatHistory.push({ role: 'typing', content: '', time: Date.now() });
             renderChatMessages();
             try {
-                const config = getAIConfig();
                 const systemPrompt = buildChatSystemPrompt();
                 const msgs = [{ role: 'system', content: systemPrompt }, ...chatHistory.filter(m => m.role === 'user' || m.role === 'ai').slice(-10).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }))];
-                const response = await fetch(config.apiUrl, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${config.apiKey}` },
-                    body: JSON.stringify({ model: config.model, messages: msgs, temperature: 0.7, max_tokens: 2000 })
-                });
-                if (!response.ok) { const errData = await response.json().catch(()=>({})); throw new Error(errData.error?.message || `API 錯誤: ${response.status}`); }
-                const data = await response.json();
+                const data = await callDeepSeek(msgs, { temperature: 0.7, max_tokens: 2000 });
                 chatHistory = chatHistory.filter(m => m.role !== 'typing');
                 chatHistory.push({ role: 'ai', content: data.choices[0].message.content, time: Date.now() });
                 saveChatHistory(); renderChatMessages();
@@ -3124,7 +3156,6 @@ function checkLockOnBoot() {
                 const ocrText = tesseractResult.data.text.trim();
                 if (!ocrText || ocrText.length < 2) throw new Error('未能從圖片中識別出文字');
                 if (statusEl) statusEl.textContent = '🤖 AI 正在分析消費信息...';
-                const config = getAIConfig();
                 const today = new Date().toISOString().split('T')[0];
                 const systemPrompt = '你是一個收據/賬單識別助手。從截圖OCR提取的文字中提取所有收支條目。繁體中文備註。\n返回JSON格式：{"items":[{"type":"expense或income","amount":數字,"category":"分類key","date":"YYYY-MM-DD","note":"備註"}]}\n注意：items數組，提取所有條目。expense分類：food,transport,shopping,entertainment,housing,medical,education,other。income分類：salary,bonus,refund,investment,transfer,other_income。若無信息返回{"error":"無法識別"}。';
                 // AI學習：注入用戶修正記錄
@@ -3132,12 +3163,10 @@ function checkLockOnBoot() {
                 const finalSystemPrompt = ocrCorrectionSummary
                     ? systemPrompt + '\n\n注意：以下是用戶過去的分類修正記錄，AI必須優先遵守這些規則：\n' + ocrCorrectionSummary
                     : systemPrompt;
-                const response = await fetch(config.apiUrl, {
-                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config.apiKey },
-                    body: JSON.stringify({ model: config.model, messages: [{ role: 'system', content: finalSystemPrompt }, { role: 'user', content: '從截圖OCR提取的文字，請識別所有收支信息：\n\n' + ocrText }], max_tokens: 800, temperature: 0.1 })
-                });
-                if (!response.ok) { const err = await response.text(); throw new Error('API錯誤 (' + response.status + '): ' + err.substring(0, 200)); }
-                const data = await response.json();
+                const data = await callDeepSeek(
+                    [{ role: 'system', content: finalSystemPrompt }, { role: 'user', content: '從截圖OCR提取的文字，請識別所有收支信息：\n\n' + ocrText }],
+                    { max_tokens: 800, temperature: 0.1 }
+                );
                 let content = (data.choices?.[0]?.message?.content || '').replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
                 const parsed = JSON.parse(content);
                 if (parsed.error) throw new Error(parsed.error);
