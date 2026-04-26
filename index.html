@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>生活成本控制 - 智能記賬 v1.1 🔒</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>智能記賬v1.2🔒</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" integrity="sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" integrity="sha384-ZstPgNL30sIz6Hlxmz87Qsg817okoeAfmzXv89YLICmfsKv3pEdQKOokOL2IpVAS" crossorigin="anonymous"></script>
     <style>
         :root {
             --primary: #4f46e5;
@@ -60,6 +60,28 @@
         .btn-secondary:hover { background: var(--border); }
         .btn-danger { background: var(--danger); color: white; }
         .btn-sm { padding: 6px 12px; font-size: 12px; }
+        /* ===== 支出/收入切換 ===== */
+        .type-toggle {
+            display: flex; background: var(--bg); border-radius: 10px;
+            padding: 3px; position: relative; margin-bottom: 12px;
+            border: 1px solid var(--border);
+        }
+        .type-toggle-btn {
+            flex: 1; padding: 8px 0; text-align: center;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            border-radius: 8px; border: none; background: transparent;
+            color: var(--text-secondary); transition: all 0.2s;
+            z-index: 1; position: relative;
+        }
+        .type-toggle-btn.active {
+            background: var(--primary); color: #fff;
+            box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+        }
+        .type-toggle-btn.income.active {
+            background: var(--success); color: #fff;
+            box-shadow: 0 2px 8px rgba(34,197,94,0.3);
+        }
+        .type-toggle-btn:hover:not(.active) { color: var(--text); }
         .theme-toggle {
             width: 44px; height: 44px; border-radius: 50%;
             border: 1px solid var(--border); background: var(--card-bg);
@@ -101,6 +123,51 @@
         .sync-status.offline { background: #6b728018; color: #6b7280; }
 
         /* 帳號按鈕 */
+        .header-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            min-width: 80px;
+            height: 36px;
+            padding: 0 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--card-bg);
+            color: var(--text);
+            font-size: 13px;
+            cursor: pointer;
+            transition: background 0.2s, border-color 0.2s;
+            white-space: nowrap;
+            box-sizing: border-box;
+        }
+        .header-btn:hover {
+            background: var(--hover-bg);
+            border-color: var(--primary);
+        }
+        .header-btn select, .header-btn button {
+            background: transparent;
+            border: none;
+            color: inherit;
+            font-size: inherit;
+            cursor: inherit;
+            padding: 0;
+            margin: 0;
+            outline: none;
+        }
+        .header-btn .account-btn-inner {
+            background: transparent;
+            border: none;
+            color: inherit;
+            font-size: inherit;
+            cursor: pointer;
+            padding: 0;
+            margin: 0;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
         .account-btn {
             height: 44px; padding: 0 14px; border-radius: 22px;
             border: 1px solid var(--border); background: var(--card-bg);
@@ -237,7 +304,7 @@
         /* 統計卡片 */
         .stats-grid {
             display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px; margin-bottom: 30px;
+            gap: 20px; margin-bottom: 20px;
         }
         .stat-card {
             background: var(--card-bg); border-radius: 16px; padding: 24px;
@@ -604,9 +671,93 @@
         .mobile-nav-item .nav-icon { font-size: 22px; line-height: 1; }
         .mobile-section { display: block; }
         .mobile-section.mobile-hidden { display: none; }
-        @media (min-width: 769px) { .mobile-section.mobile-hidden { display: block; } }
+        /* Desktop: tab-based layout — JS manages which section is visible */
+        @media (min-width: 769px) {
+            .mobile-section { display: none; }
+            .mobile-section.tab-active { display: block; }
+        }
+
+
+        /* ===== 桌面版 Tab 導航 ===== */
+        .desktop-tabs {
+            display: none; flex-wrap: wrap; gap: 4px;
+            padding: 8px 0 12px; border-bottom: 1px solid var(--border);
+            margin-bottom: 16px;
+        }
+        .desktop-tab {
+            padding: 8px 20px; border: 1px solid var(--border);
+            border-radius: 8px; background: var(--card-bg);
+            color: var(--text-secondary); font-size: 14px; cursor: pointer;
+            transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+        }
+        .desktop-tab:hover { border-color: var(--primary); color: var(--primary); }
+        .desktop-tab.active {
+            background: var(--primary); color: #fff;
+            border-color: var(--primary); box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+        }
+        @media (min-width: 769px) {
+            .desktop-tabs { display: flex; }
+            .mobile-nav { display: none !important; }
+        }
+        @media (max-width: 768px) {
+            .desktop-tabs { display: none !important; }
+        }
 
         @media (max-width: 1024px) { .container { max-width: 100%; padding: 16px; } }
+
+        /* ===== 手機快捷記帳 FAB ===== */
+        .fab-btn {
+            display: none; position: fixed; bottom: 76px; right: 16px;
+            width: 54px; height: 54px; border-radius: 50%;
+            background: var(--primary); color: #fff; border: none;
+            font-size: 26px; line-height: 54px; text-align: center;
+            box-shadow: 0 4px 16px rgba(99,102,241,0.45);
+            z-index: 1100; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .fab-btn:active { transform: scale(0.92); }
+        .fab-btn.open { transform: rotate(45deg); }
+        @media (max-width: 768px) { .fab-btn { display: block; } }
+
+        /* 快捷記帳彈窗 */
+        .quick-modal {
+            display: none; position: fixed; inset: 0; z-index: 1200;
+            background: rgba(0,0,0,0.45); align-items: flex-end; justify-content: center;
+        }
+        .quick-modal.show { display: flex; }
+        .quick-sheet {
+            background: var(--card-bg); border-radius: 20px 20px 0 0;
+            width: 100%; max-width: 480px; padding: 20px 20px 28px;
+            animation: slideUp 0.25s ease-out;
+            max-height: 80vh; overflow-y: auto;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .quick-sheet .quick-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 16px;
+        }
+        .quick-sheet .quick-title { font-size: 18px; font-weight: 700; }
+        .quick-sheet .quick-close {
+            width: 32px; height: 32px; border-radius: 50%; border: none;
+            background: var(--bg); font-size: 18px; cursor: pointer; color: var(--text-secondary);
+        }
+        .quick-sheet .category-tags { gap: 8px; }
+        .quick-sheet .category-tag { padding: 8px 14px; font-size: 13px; }
+        .quick-sheet .form-group { margin-bottom: 14px; }
+        .quick-sheet .form-group label { font-size: 13px; margin-bottom: 6px; display: block; color: var(--text-secondary); }
+        .quick-sheet input, .quick-sheet select {
+            width: 100%; padding: 10px 12px; border-radius: 10px;
+            border: 1px solid var(--border); background: var(--bg); color: var(--text);
+            font-size: 16px; /* prevent iOS zoom */
+        }
+        .quick-sheet .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .quick-sheet .btn-submit {
+            width: 100%; padding: 12px; border-radius: 12px;
+            background: var(--primary); color: #fff; border: none;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+            margin-top: 4px;
+        }
 
         @media (max-width: 768px) {
             .container { padding: 10px 12px; padding-bottom: 80px; }
@@ -682,6 +833,12 @@
             .expense-amount { font-size: 14px; }
         }
 
+        @media (max-width: 768px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
+            .stat-card { padding: 14px; }
+            .stat-value { font-size: 22px; }
+            .stat-label { font-size: 12px; }
+        }
         @media (max-width: 768px) and (orientation: landscape) {
             .stats-grid { grid-template-columns: repeat(4, 1fr); }
             .chat-container { height: 260px; }
@@ -775,13 +932,14 @@
     <div class="container" id="appContainer">
         <header>
             <div class="header-left">
-                <h1>💰 生活成本控制</h1>
+                <h1>💰智能記賬</h1>
                 <span class="design-by">design by SILENCE</span>
-                <span class="security-text" style="font-size:11px;color:var(--text-secondary);margin-left:8px;white-space:nowrap;">🔒 你的數據安全已實時受AI保護，所有數據均不會公開且不能讀取</span>
             </div>
             <div class="header-actions">
                 <div style="position:relative;">
-                    <button class="account-btn" id="accountBtn" onclick="toggleAccountMenu()">👤 <span id="accountName">帳號</span> ▾</button>
+                    <div class="header-btn">
+                        <button class="account-btn-inner" id="accountBtn" onclick="toggleAccountMenu()">👤 <span id="accountName">帳號</span> ▾</button>
+                    </div>
                     <div class="account-dropdown" id="accountDropdown">
                         <button class="account-option" onclick="showAccountInfo()">👤 帳號資訊</button>
                         <button class="account-option" onclick="openProfileModal()">📋 個人資料</button>
@@ -789,55 +947,21 @@
                         <button class="account-option danger" onclick="openDeleteAccountModal()">⚠️ 刪除帳號</button>
                     </div>
                 </div>
-                <button class="btn btn-secondary btn-sm" onclick="exportData()">📥 導出</button>
-                <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importFile').click()">📤 導入</button>
-                <input type="file" id="importFile" style="display:none" accept=".json" onchange="importData(this)">
-                <select class="currency-select" id="currencySelect" onchange="setCurrency(this.value)">
+
+                <select class="header-btn" id="currencySelect" onchange="setCurrency(this.value)">
                     <option value="MOP">🇲🇴 MOP</option>
                     <option value="CNY">🇨🇳 CNY</option>
                     <option value="USD">🇺🇸 USD</option>
                 </select>
-                <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
-                <button class="btn-refresh" onclick="refreshFromCloud()" title="從雲端重新載入">🔄</button>
-                <span class="sync-status" id="syncStatus"></span>
+                <button class="header-btn theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
+
+                <span class="header-btn sync-status" id="syncStatus"></span>
                 <span id="learningBadge" style="font-size:11px;display:none;"></span>
             </div>
         </header>
 
-        <!-- 手機端底部導航 -->
-        <div class="mobile-nav">
-            <div class="mobile-nav-items">
-                <button class="mobile-nav-item active" onclick="switchMobileTab('home', this)">
-                    <span class="nav-icon">🏠</span>
-                    <span>首頁</span>
-                </button>
-                <button class="mobile-nav-item" onclick="switchMobileTab('add', this)">
-                    <span class="nav-icon">➕</span>
-                    <span>記帳</span>
-                </button>
-                <button class="mobile-nav-item" onclick="switchMobileTab('budget', this)">
-                    <span class="nav-icon">🎯</span>
-                    <span>預算</span>
-                </button>
-                <button class="mobile-nav-item" onclick="switchMobileTab('chart', this)">
-                    <span class="nav-icon">📊</span>
-                    <span>圖表</span>
-                </button>
-                <button class="mobile-nav-item" onclick="switchMobileTab('record', this)">
-                    <span class="nav-icon">📝</span>
-                    <span>記錄</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- 首頁 -->
-        <div class="mobile-section" id="section-home">
-        <div class="stats-grid">
-            <div class="stat-card">
-                <div class="stat-label">本月支出</div>
-                <div class="stat-value" id="monthTotal">¥0.00</div>
-                <div class="stat-change" id="monthChange">--</div>
-            </div>
+        <!-- 統計卡片（全局置頂） -->
+        <div class="stats-grid" id="statsTop">
             <div class="stat-card">
                 <div class="stat-label">本月預算剩餘</div>
                 <div class="stat-value" id="budgetLeft">¥0.00</div>
@@ -848,12 +972,162 @@
                 <div class="stat-value" id="todayTotal">¥0.00</div>
                 <div class="stat-change" id="todayChange">--</div>
             </div>
+        </div>
+
+        <!-- 桌面版 Tab 導航 -->
+        <div class="desktop-tabs" id="desktopTabs">
+            <button class="desktop-tab active" onclick="switchMobileTab('add', this)">
+                <span>➕</span><span>記帳</span>
+            </button>
+            <button class="desktop-tab" onclick="switchMobileTab('home', this)">
+                <span>🤖</span><span>AI</span>
+            </button>
+            <button class="desktop-tab" onclick="switchMobileTab('budget', this)">
+                <span>🎯</span><span>預算</span>
+            </button>
+            <button class="desktop-tab" onclick="switchMobileTab('data', this)">
+                <span>📊</span><span>數據</span>
+            </button>
+            <button class="desktop-tab" onclick="switchMobileTab('chart', this)">
+                <span>📈</span><span>圖表</span>
+            </button>
+            <button class="desktop-tab" onclick="switchMobileTab('record', this)">
+                <span>📝</span><span>記錄</span>
+            </button>
+        </div>
+
+        <!-- 手機端底部導航 -->
+        <div class="mobile-nav">
+            <div class="mobile-nav-items">
+                <button class="mobile-nav-item active" onclick="switchMobileTab('add', this)">
+                    <span class="nav-icon">➕</span>
+                    <span>記帳</span>
+                </button>
+                <button class="mobile-nav-item" onclick="switchMobileTab('home', this)">
+                    <span class="nav-icon">🤖</span>
+                    <span>AI</span>
+                </button>
+                <button class="mobile-nav-item" onclick="switchMobileTab('budget', this)">
+                    <span class="nav-icon">🎯</span>
+                    <span>預算</span>
+                </button>
+                <button class="mobile-nav-item" onclick="switchMobileTab('data', this)">
+                    <span class="nav-icon">📊</span>
+                    <span>數據</span>
+                </button>
+                <button class="mobile-nav-item" onclick="switchMobileTab('chart', this)">
+                    <span class="nav-icon">📈</span>
+                    <span>圖表</span>
+                </button>
+                <button class="mobile-nav-item" onclick="switchMobileTab('record', this)">
+                    <span class="nav-icon">📝</span>
+                    <span>記錄</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 記帳區塊 -->
+        <div class="mobile-section" id="section-add">
+        <div class="main-grid">
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">➕ 記一筆</span>
+                </div>
+                <div class="screenshot-area" id="screenshotArea" onclick="document.getElementById('screenshotInput').click()">
+                    <div class="icon">📸</div>
+                    <div class="title">截圖 / 拍照智能記賬</div>
+                    <div class="hint">拖曳收據截圖到此，或點擊上傳 · 支持拍照</div>
+                    <button type="button" class="camera-btn" onclick="event.stopPropagation();document.getElementById('cameraInput').click()">📷 拍照</button>
+                    <input type="file" id="screenshotInput" accept="image/*" style="display:none" onchange="handleScreenshot(this)">
+                    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleScreenshot(this)">
+                </div>
+                <div id="screenshotPreview" style="display:none;"></div>
+                <div id="screenshotResult" style="display:none;"></div>
+                <form id="expenseForm" onsubmit="addExpense(event)">
+                    <div class="type-toggle" id="mainTypeToggle">
+                        <button type="button" class="type-toggle-btn active" id="mainExpenseBtn" onclick="switchMainType('expense')">💸 支出</button>
+                        <button type="button" class="type-toggle-btn" id="mainIncomeBtn" onclick="switchMainType('income')">💰 收入</button>
+                    </div>
+                    <div class="form-group">
+                        <label>分類</label>
+                        <div class="category-tags" id="categoryTags"></div>
+                        <input type="hidden" id="category" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>金額</label>
+                            <input type="number" id="amount" step="0.01" min="0" placeholder="0.00" required>
+                        </div>
+                        <div class="form-group">
+                            <label>日期</label>
+                            <input type="date" id="date" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>備註</label>
+                        <input type="text" id="note" placeholder="可選：輸入備註信息">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width:100%">💾 保存支出</button>
+                </form>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <span class="card-title">📊 收支分類</span>
+                </div>
+                <div style="text-align:center;font-size:14px;font-weight:600;padding:8px 0 4px;">
+                    <span style="color:#ef4444;">📊 支出</span>
+                </div>
+                <div class="chart-container">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+                <hr style="margin:12px 0;border:none;border-top:1px solid var(--border);opacity:0.3;">
+                <div style="text-align:center;font-size:14px;font-weight:600;padding:8px 0 4px;">
+                    <span style="color:#22c55e;">💰 收入</span>
+                </div>
+                <div class="chart-container" style="margin-top:0;">
+                    <canvas id="incomeCategoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- 首頁 -->
+        <div class="mobile-section mobile-hidden" id="section-data">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">本月支出</div>
+                <div class="stat-value" id="monthTotal">¥0.00</div>
+                <div class="stat-change" id="monthChange">--</div>
+            </div>
             <div class="stat-card">
                 <div class="stat-label">平均每日</div>
                 <div class="stat-value" id="avgDaily">¥0.00</div>
                 <div class="stat-change" id="avgStatus">--</div>
             </div>
+            <div class="stat-card" style="border-left:3px solid var(--success);">
+                <div class="stat-label">📈 本月收入</div>
+                <div class="stat-value" id="monthIncome" style="color:var(--success);">¥0.00</div>
+                <div class="stat-change" id="monthIncomeChange"></div>
+            </div>
+            <div class="stat-card" style="border-left:3px solid var(--success);">
+                <div class="stat-label">📈 今日收入</div>
+                <div class="stat-value" id="todayIncome" style="color:var(--success);">¥0.00</div>
+                <div class="stat-change" id="todayIncomeChange"></div>
+            </div>
+            <div class="stat-card" style="border-left:3px solid var(--success);">
+                <div class="stat-label">📈 日均收入</div>
+                <div class="stat-value" id="avgIncome" style="color:var(--success);">¥0.00</div>
+                <div class="stat-change" id="avgIncomeChange"></div>
+            </div>
+            <div class="stat-card" style="border-left:3px solid var(--success);">
+                <div class="stat-label">💰 淨收支</div>
+                <div class="stat-value" id="netBalance" style="color:var(--warning);">¥0.00</div>
+                <div class="stat-change" id="netBalanceChange"></div>
+            </div>
         </div>
+        </div>
+
+        <div class="mobile-section mobile-hidden" id="section-home">
 
         <div class="card" style="margin-bottom:20px;">
             <div class="card-header">
@@ -899,57 +1173,6 @@
         </div>
         </div>
 
-        <!-- 記帳區塊 -->
-        <div class="mobile-section mobile-hidden" id="section-add">
-        <div class="main-grid">
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">➕ 記一筆</span>
-                </div>
-                <div class="screenshot-area" id="screenshotArea" onclick="document.getElementById('screenshotInput').click()">
-                    <div class="icon">📸</div>
-                    <div class="title">截圖 / 拍照智能記賬</div>
-                    <div class="hint">拖曳收據截圖到此，或點擊上傳 · 支持拍照</div>
-                    <button type="button" class="camera-btn" onclick="event.stopPropagation();document.getElementById('cameraInput').click()">📷 拍照</button>
-                    <input type="file" id="screenshotInput" accept="image/*" style="display:none" onchange="handleScreenshot(this)">
-                    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleScreenshot(this)">
-                </div>
-                <div id="screenshotPreview" style="display:none;"></div>
-                <div id="screenshotResult" style="display:none;"></div>
-                <form id="expenseForm" onsubmit="addExpense(event)">
-                    <div class="form-group">
-                        <label>分類</label>
-                        <div class="category-tags" id="categoryTags"></div>
-                        <input type="hidden" id="category" required>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>金額</label>
-                            <input type="number" id="amount" step="0.01" min="0" placeholder="0.00" required>
-                        </div>
-                        <div class="form-group">
-                            <label>日期</label>
-                            <input type="date" id="date" required>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>備註</label>
-                        <input type="text" id="note" placeholder="可選：輸入備註信息">
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width:100%">💾 保存支出</button>
-                </form>
-            </div>
-            <div class="card">
-                <div class="card-header">
-                    <span class="card-title">📊 支出分類</span>
-                </div>
-                <div class="chart-container">
-                    <canvas id="categoryChart"></canvas>
-                </div>
-            </div>
-        </div>
-        </div>
-
         <!-- 預算區塊 -->
         <div class="mobile-section mobile-hidden" id="section-budget">
         <div class="main-grid">
@@ -976,17 +1199,34 @@
 
         <!-- 圖表區塊 -->
         <div class="mobile-section mobile-hidden" id="section-chart">
-        <div class="card" style="margin-bottom:20px;">
+        <div class="card" style="margin-bottom:12px;">
             <div class="card-header">
-                <span class="card-title">📈 支出趨勢</span>
-                <select id="trendPeriod" onchange="updateTrendChart()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);">
-                    <option value="7">近7天</option>
-                    <option value="30">近30天</option>
-                    <option value="90">近3個月</option>
-                </select>
+                <span class="card-title" style="color:var(--danger);">🔴 支出趨勢</span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <select id="trendPeriodExp" onchange="updateExpenseTrend()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:12px;">
+                        <option value="7">近7天</option>
+                        <option value="30" selected>近30天</option>
+                        <option value="90">近3個月</option>
+                    </select>
+                </div>
             </div>
             <div class="chart-container">
-                <canvas id="trendChart"></canvas>
+                <canvas id="expenseTrendChart"></canvas>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+                <span class="card-title" style="color:var(--success);">🟢 收入趨勢</span>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <select id="trendPeriodInc" onchange="updateIncomeTrend()" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);font-size:12px;">
+                        <option value="7">近7天</option>
+                        <option value="30" selected>近30天</option>
+                        <option value="90">近3個月</option>
+                    </select>
+                </div>
+            </div>
+            <div class="chart-container">
+                <canvas id="incomeTrendChart"></canvas>
             </div>
         </div>
         </div>
@@ -1007,6 +1247,18 @@
                 <input type="text" id="searchText" placeholder="搜索備註..." oninput="renderExpenseList()">
             </div>
             <div class="expense-list" id="expenseList"></div>
+        </div>
+        <div class="card" style="margin-top:12px;">
+            <div class="card-header">
+                <span class="card-title">📈 收入記錄</span>
+            </div>
+            <div class="filter-bar">
+                <select id="filterIncomeMonth" onchange="renderIncomeList()">
+                    <option value="">全部月份</option>
+                </select>
+                <input type="text" id="searchIncomeText" placeholder="搜索備註..." oninput="renderIncomeList()">
+            </div>
+            <div class="expense-list" id="incomeList"></div>
         </div>
         </div>
     </div>
@@ -1131,8 +1383,12 @@
                     所有支出記錄、預算設定、個人資料、AI 對話記錄<br>
                     以及 AI 學習記錄將被徹底清除。
                 </div>
-                <div style="font-size:13px;color:var(--warning);margin-bottom:20px;padding:12px;background:rgba(245,158,11,0.1);border-radius:10px;">
-                    ⏱️ 請仔細確認，按鈕將在 10 秒後啟用
+                <div style="font-size:13px;color:var(--warning);margin-bottom:16px;padding:12px;background:rgba(245,158,11,0.1);border-radius:10px;">
+                    ⏱️ 請輸入帳號密碼確認刪除，按鈕將在 10 秒後啟用
+                </div>
+                <div style="margin-bottom:16px;">
+                    <input type="password" id="deletePwdInput" placeholder="輸入密碼確認刪除" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);" onkeydown="if(event.key==='Enter'&&!document.getElementById('confirmDeleteBtn').disabled)confirmDeleteAccount();">
+                    <div id="deletePwdError" style="font-size:12px;color:var(--danger);margin-top:6px;min-height:18px;"></div>
                 </div>
                 <div style="display:flex;gap:12px;">
                     <button class="btn btn-secondary" onclick="cancelDeleteAccount()" style="flex:1;">取消</button>
@@ -1151,11 +1407,18 @@
         let accounts = {};
         let deviceMap = {};
 
-        // 註冊邀請碼（SHA-256 加密儲存，僅用於註冊驗證）
-        const REGISTER_CODE_HASH = 'e796bbd5fa9e80d0d6c8f62847cafe3340f283ff195ff5e23f9b9c8062d0be8f'; // 2026NTMY
+        // 註冊邀請碼驗證 → 移入服務端 admin-verify Edge Function
         async function verifyRegisterCode(input) {
-            const h = await hashPassword(input);
-            return h === REGISTER_CODE_HASH;
+            try {
+                const res = await fetch(SUPABASE_URL + '/functions/v1/admin-verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+                    body: JSON.stringify({ type: 'register', code: input })
+                });
+                if (!res.ok) return false;
+                const data = await res.json();
+                return data.success === true;
+            } catch { return false; }
         }
 
         // 操作本地存儲的包裝函數（自動添加帳號前綴）
@@ -1288,7 +1551,24 @@
         const SUPABASE_URL = 'https://ddpywfymrbdhmalmbtaq.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_w-LmlN6RSC8-aZky3-K_Sw_W0fi7YnE';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkcHl3ZnltcmJkaG1hbG1idGFxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwODcxNjksImV4cCI6MjA5MjY2MzE2OX0.XaAZ4OpnXKNRUw52885t4qbnTx35u-Rv4DcwW0MTQT8';
-        const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        // db-proxy Edge Function wrapper
+        const DBPROXY_URL = SUPABASE_URL + '/functions/v1/db-proxy';
+        async function dbProxy(body) {
+            const res = await fetch(DBPROXY_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+            body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || 'dbProxy error: ' + res.status);
+            }
+            return await res.json();
+        }
+
+
         let cloudSyncing = false;
         let lastCloudSync = 0;
         // ==================== 货币系统 (MOP/CNY/USD) ====================
@@ -1318,24 +1598,38 @@
             return c.symbol + (n * c.rate).toFixed(d !== undefined ? d : 2);
         }
         function fmt0(n) { return fmt(n, 0); }
+        function inputAmount(val) { return parseFloat(val) / CURRENCIES[currentCurrency].rate; }
+        function fmtWith(n, cur, d) { if (n === undefined || n === null) n = 0; const cc = CURRENCIES[cur] || CURRENCIES['MOP']; return cc.symbol + (n * cc.rate).toFixed(d !== undefined ? d : 2); }
+        function inputAmountWith(val, cur) { const cc = CURRENCIES[cur] || CURRENCIES['MOP']; return parseFloat(val) / cc.rate; }
 
         // 從 Supabase 讀取全部數據
         async function fetchSupabaseData() {
-            const [accRes, devRes, udRes] = await Promise.all([
+            // Accounts + device_map: direct Supabase (quasi-public, needed for login)
+            const [accRes, devRes] = await Promise.all([
                 _supabase.from('accounts').select('*'),
-                _supabase.from('device_map').select('*'),
-                _supabase.from('user_data').select('*')
+                _supabase.from('device_map').select('*')
             ]);
-            if (accRes.error) throw new Error('Supabase讀取accounts失敗: ' + accRes.error.message);
-            if (devRes.error) throw new Error('Supabase讀取device_map失敗: ' + devRes.error.message);
-            if (udRes.error) throw new Error('Supabase讀取user_data失敗: ' + udRes.error.message);
-            // 轉換為舊格式兼容
+            if (accRes.error) throw new Error('該取accounts失敗: ' + accRes.error.message);
+            if (devRes.error) throw new Error('該取device_map失敗: ' + devRes.error.message);
+            // User_data: via db-proxy device mode
+            let udResult = { data: [] };
+            try {
+                udResult = await dbProxy({ mode: 'device', deviceId: getDeviceId(), table: 'user_data', action: 'select' });
+            } catch(e) { console.warn('dbProxy user_data select failed:', e.message); }
+            // 轉換為兼容格式
             const accounts = {};
-            (accRes.data || []).forEach(r => { accounts[r.username] = { passwordHash: r.password_hash, createdAt: r.created_at }; });
+            (accRes.data || []).forEach(r => {
+                accounts[r.username] = {
+                    clientSalt: r.client_salt || '',
+                    serverHash: r.server_hash || '',
+                    passwordHash: r.password_hash || r.password || '',
+                    createdAt: r.created_at
+                };
+            });
             const deviceMap = {};
             (devRes.data || []).forEach(r => { deviceMap[r.device_id] = r.username; });
             const userData = {};
-            (udRes.data || []).forEach(r => {
+            (udResult.data || []).forEach(r => {
                 userData[r.username] = {
                     expenses: r.expenses || [],
                     budgets: r.budgets || {default:{food:0,transport:0,shopping:0,entertainment:0,housing:0,medical:0,education:0,other:0}, monthly:{}},
@@ -1354,36 +1648,48 @@
             const deviceMap = allData.deviceMap || {};
             const userData = allData.userData || {};
 
-            // 1. Upsert accounts
+            // 1. Upsert accounts (direct)
             const accRows = Object.entries(accounts).map(([username, v]) => ({
-                username, password_hash: v.passwordHash, created_at: v.createdAt || new Date().toISOString()
+                username,
+                client_salt: v.clientSalt || '',
+                server_hash: v.serverHash || '',
+                password: v.passwordHash || '',
+                created_at: v.createdAt || new Date().toISOString()
             }));
             if (accRows.length > 0) {
                 const r = await _supabase.from('accounts').upsert(accRows, { onConflict: 'username' });
                 if (r.error) console.warn('⚠️ accounts upsert失敗:', r.error.message);
             }
 
-            // 2. Upsert device_map
+            // 2. Upsert device_map (direct)
             const devRows = Object.entries(deviceMap).map(([device_id, username]) => ({ device_id, username }));
             if (devRows.length > 0) {
                 const r = await _supabase.from('device_map').upsert(devRows, { onConflict: 'device_id' });
                 if (r.error) console.warn('⚠️ device_map upsert失敗:', r.error.message);
             }
 
-            // 3. Upsert user_data
-            const udRows = Object.entries(userData).map(([username, v]) => ({
-                username,
-                expenses: v.expenses || [],
-                budgets: v.budgets || {default:{food:0,transport:0,shopping:0,entertainment:0,housing:0,medical:0,education:0,other:0}, monthly:{}},
-                budget_history: v.budgetHistory || [],
-                chat_history: v.chatHistory || [],
-                profile: v.profile || {},
-                corrections: v.corrections || [],
-                updated_at: new Date().toISOString()
-            }));
-            if (udRows.length > 0) {
-                const r = await _supabase.from('user_data').upsert(udRows, { onConflict: 'username' });
-                if (r.error) console.warn('⚠️ user_data upsert失敗:', r.error.message);
+            // 3. Upsert current user's user_data (via db-proxy device mode)
+            const deviceId = getDeviceId();
+            const currentUsername = deviceMap[deviceId];
+            if (currentUsername && userData[currentUsername]) {
+                const v = userData[currentUsername];
+                await dbProxy({
+                    mode: 'device', deviceId,
+                    table: 'user_data', action: 'upsert',
+                    conflictColumn: 'username',
+                    data: [{
+                        username: currentUsername,
+                        expenses: v.expenses || [],
+                        budgets: v.budgets || {default:{food:0,transport:0,shopping:0,entertainment:0,housing:0,medical:0,education:0,other:0}, monthly:{}},
+                        budget_history: v.budgetHistory || [],
+                        chat_history: v.chatHistory || [],
+                        profile: v.profile || {},
+                        corrections: v.corrections || [],
+                        updated_at: new Date().toISOString()
+                    }]
+                }).catch(e => console.warn('⚠️ user_data upsert失敗:', e.message));
+            } else {
+                console.warn('pushSupabaseData: no current user for device, skipping user_data');
             }
 
             lastCloudSync = Date.now();
@@ -1405,43 +1711,69 @@
                 console.log('✅ Supabase 雲端同步完成');
             } catch (e) {
                 console.warn('⚠️ Supabase 讀取失敗:', e.message);
-                // 嘗試從本機緩存恢復
-                const cache = loadLocalCacheRaw();
+                // 嘗試從本機緩存恢復（先試加密版，再試明文版）
+                let cache = await loadLocalCacheDecrypted();
                 if (cache) {
                     window.__cloudData = cache.userData || {};
                     window.__cloudAccounts = cache.accounts || {};
                     window.__cloudDeviceMap = cache.deviceMap || {};
                     updateSyncStatus('offline');
-                    console.log('✅ 從本機緩存恢復');
+                    console.log('✅ 從本機加密緩存恢復');
                 } else {
-                    window.__cloudData = null;
-                    window.__cloudAccounts = null;
-                    window.__cloudDeviceMap = null;
-                    updateSyncStatus('offline');
+                    cache = loadLocalCachePlain();
+                    if (cache) {
+                        window.__cloudData = cache.userData || {};
+                        window.__cloudAccounts = cache.accounts || {};
+                        window.__cloudDeviceMap = cache.deviceMap || {};
+                        updateSyncStatus('offline');
+                        console.log('✅ 從本機明文緩存恢復');
+                    } else {
+                        window.__cloudData = null;
+                        window.__cloudAccounts = null;
+                        window.__cloudDeviceMap = null;
+                        updateSyncStatus('offline');
+                    }
                 }
             }
         }
         const CACHE_KEY_PREFIX = 'costControl_cache_';
-        function loadLocalCacheRaw() {
+        function loadLocalCachePlain() {
             try {
                 const raw = localStorage.getItem(CACHE_KEY_PREFIX + '_cloud_snapshot');
                 return raw ? JSON.parse(raw) : null;
             } catch(e) { return null; }
         }
+        async function loadLocalCacheDecrypted() {
+            try {
+                const raw = localStorage.getItem(CACHE_KEY_PREFIX + '_cloud_snapshot_enc');
+                if (!raw) return null;
+                return await decryptLocalData(raw);
+            } catch(e) { return null; }
+        }
         function saveLocalCache() {
             if (!currentUserId) return;
-            // 存用戶數據
+            // 存用戶數據（加密）
             const ud = window.__cloudData?.[currentUserId];
-            if (ud) localStorage.setItem(CACHE_KEY_PREFIX + currentUserId, JSON.stringify(ud));
-            // 存全局快照
-            localStorage.setItem(CACHE_KEY_PREFIX + '_cloud_snapshot', JSON.stringify({
+            if (ud) {
+                encryptLocalData(ud).then(enc => {
+                    localStorage.setItem(CACHE_KEY_PREFIX + currentUserId, enc);
+                }).catch(() => {
+                    // 加密失敗時回退到明文
+                    localStorage.setItem(CACHE_KEY_PREFIX + currentUserId, JSON.stringify(ud));
+                });
+            }
+            // 存全局快照（加密）
+            encryptLocalData({
                 accounts: window.__cloudAccounts || {},
                 deviceMap: window.__cloudDeviceMap || {},
                 userData: window.__cloudData || {}
-            }));
-        }
-
-        // 將記憶體中的雲端數據推送到 Supabase
+            }).then(enc => {
+                localStorage.setItem(CACHE_KEY_PREFIX + '_cloud_snapshot_enc', enc);
+            }).catch(() => {
+                // 加密失敗時回退到明文
+                localStorage.setItem(CACHE_KEY_PREFIX + '_cloud_snapshot_enc', '{}');
+            });
+        }// 將記憶體中的雲端數據推送到 Supabase
         async function syncAfterMutation() {
             if (cloudSyncing) { console.log('⏳ 已有同步進行中'); return; }
             cloudSyncing = true;
@@ -1502,6 +1834,7 @@
                 loadData();
                 loadBudgets();
                 loadBudgetHistory();
+                loadCustomCats();
                 loadChatHistory();
                 renderCategoryTags();
                 renderFilterOptions();
@@ -1554,20 +1887,37 @@
             syncAfterMutation();
         }
 
-        // SHA-256 雜湊 (用於密碼存儲，支援 file:// 協議)
-        async function hashPassword(password) {
-            const saltStr = '_costControl_2024';
+        // PBKDF2 雜湊（服務端驗證用，支援自定義 salt）
+        async function pbkdf2(password, salt, iterations = 200000) {
             const enc = new TextEncoder();
-            const salt = enc.encode(saltStr);
             const keyMaterial = await crypto.subtle.importKey(
                 'raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']
             );
             const bits = await crypto.subtle.deriveBits(
-                { name: 'PBKDF2', hash: 'SHA-256', salt: salt, iterations: 200000 },
+                { name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(salt), iterations },
                 keyMaterial, 256
             );
             const arr = Array.from(new Uint8Array(bits));
             return arr.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+        function generateSalt() {
+            const bytes = new Uint8Array(32);
+            crypto.getRandomValues(bytes);
+            return btoa(String.fromCharCode(...bytes));
+        }
+        // auth-proxy Edge Function wrapper
+        const AUTH_URL = SUPABASE_URL + '/functions/v1/auth-proxy';
+        async function authProxy(body) {
+            const res = await fetch(AUTH_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}));
+                throw new Error(errData.error || 'auth-proxy error: ' + res.status);
+            }
+            return await res.json();
         }
 
         // 登入模式切換
@@ -1625,7 +1975,7 @@
             }
         }
 
-        // 處理登入/註冊
+        // 處理登入/註冊（全部經由 auth-proxy Edge Function）
         async function handleLogin() {
             clearLoginMessages();
             const username = document.getElementById('loginUsername').value.trim();
@@ -1646,54 +1996,70 @@
             setLoading(true);
 
             try {
-                const hashedPass = await hashPassword(password);
-
                 if (isRegisterMode) {
-                    // 註冊 — 檢查 Supabase 是否已存在
-                    const { data: existing } = await _supabase.from('accounts').select('username').ilike('username', username);
-                    if (existing && existing.length > 0) {
-                        showLoginError('用戶名已被註冊');
+                    // === 註冊流程 ===
+                    const clientSalt = generateSalt();
+                    const clientHash = await pbkdf2(password, clientSalt);
+                    const result = await authProxy({
+                        action: 'register',
+                        username,
+                        clientHash,
+                        clientSalt
+                    });
+                    if (!result.success) {
+                        showLoginError('註冊失敗：' + (result.error || '未知錯誤'));
                         setLoading(false);
                         return;
                     }
-                    // 插入帳號
-                    const { error: accErr } = await _supabase.from('accounts').insert({ username, password_hash: hashedPass });
-                    if (accErr) { showLoginError('註冊失敗：' + accErr.message); setLoading(false); return; }
                     // 綁定設備碼
                     const deviceId = getDeviceId();
                     await _supabase.from('device_map').upsert({ device_id: deviceId, username }, { onConflict: 'device_id' });
                     // 創建空用戶數據
-                    await _supabase.from('user_data').insert({
+                    await dbProxy({ mode: 'device', deviceId: getDeviceId(), table: 'user_data', action: 'insert', data: [{
                         username,
                         expenses: [],
                         budgets: {default:{food:0,transport:0,shopping:0,entertainment:0,housing:0,medical:0,education:0,other:0}, monthly:{}},
                         budget_history: [], chat_history: [], profile: {}, corrections: []
-                    });
-                    // 更新內存
+                    }]}).catch(e => console.warn('user_data insert failed:', e));
                     loadAccounts();
                     currentUserId = username;
                     showLoginSuccess('🎉 註冊成功！正在進入...');
                     setTimeout(() => enterApp(), 500);
                 } else {
-                    // 登入 — 從 Supabase 查詢帳號
-                    const { data: accRows, error: accErr2 } = await _supabase.from('accounts').select('*').ilike('username', username);
-                    if (accErr2) { showLoginError('查詢失敗：' + accErr2.message); setLoading(false); return; }
-                    if (!accRows || accRows.length === 0) {
+                    // === 登入流程 ===
+                    // 1. 獲取該用戶的 client salt
+                    const saltResult = await authProxy({ action: 'get_client_salt', username });
+                    if (!saltResult.success) {
                         showLoginError('用戶名不存在，請先註冊');
                         setLoading(false);
                         return;
                     }
-                    const acc = accRows[0];
-                    if (acc.password_hash !== hashedPass) {
+                    // 2. 用 client salt 進行 PBKDF2
+                    let clientHash;
+                    if (saltResult.clientSalt) {
+                        clientHash = await pbkdf2(password, saltResult.clientSalt);
+                    } else {
+                        // 無 clientSalt = 尚未遷移的舊帳號（使用舊流程以相容）
+                        const enc = new TextEncoder();
+                        const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+                        const bits = await crypto.subtle.deriveBits(
+                            { name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode('_costControl_2024'), iterations: 200000 },
+                            keyMaterial, 256
+                        );
+                        const arr = Array.from(new Uint8Array(bits));
+                        clientHash = arr.map(b => b.toString(16).padStart(2, '0')).join('');
+                    }
+                    // 3. 驗證
+                    const loginResult = await authProxy({ action: 'login', username, clientHash });
+                    if (!loginResult.success) {
                         showLoginError('密碼錯誤');
                         setLoading(false);
                         return;
                     }
-                    const matchedKey = acc.username;
+                    const matchedKey = username;
                     // 更新設備綁定
                     const deviceId = getDeviceId();
                     await _supabase.from('device_map').upsert({ device_id: deviceId, username: matchedKey }, { onConflict: 'device_id' });
-                    // 更新內存
                     loadAccounts();
                     currentUserId = matchedKey;
                     showLoginSuccess('🎉 登入成功！正在進入...');
@@ -1837,12 +2203,16 @@
         function openDeleteAccountModal() {
             document.getElementById('accountDropdown').classList.remove('show');
             document.getElementById('deleteAccountName').textContent = currentUserId;
+            document.getElementById('deletePwdInput').value = '';
+            document.getElementById('deletePwdError').textContent = '';
             document.getElementById('deleteAccountModal').classList.add('active');
             startDeleteCountdown();
+            setTimeout(() => document.getElementById('deletePwdInput').focus(), 100);
         }
 
         function cancelDeleteAccount() {
             document.getElementById('deleteAccountModal').classList.remove('active');
+            document.getElementById('deletePwdError').textContent = '';
             stopDeleteCountdown();
         }
 
@@ -1880,11 +2250,36 @@
         async function confirmDeleteAccount() {
             const username = currentUserId;
             if (!username) return;
+            const pwdInput = document.getElementById('deletePwdInput');
+            const pwdError = document.getElementById('deletePwdError');
+            const password = pwdInput.value.trim();
+            if (!password) { pwdError.textContent = '❌ 請輸入密碼確認刪除'; return; }
+
+            // 驗證密碼（先嘗試新 auth-proxy 方式，若失敗則本地 SHA-256 回退）
+            let pwdOk = false;
+            try {
+                const authResult = await fetch(`${SUPABASE_EF_URL}/auth-proxy`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+                    body: JSON.stringify({ action: 'login', username: username, password: password, deviceId: getDeviceId() })
+                }).then(r => r.json());
+                if (authResult.success) pwdOk = true;
+            } catch(e) {}
+            // 舊版 SHA-256 回退
+            if (!pwdOk && accounts[username]) {
+                const hash = await sha256(password);
+                pwdOk = (hash === accounts[username].password_hash);
+            }
+            if (!pwdOk) {
+                pwdError.textContent = '❌ 密碼錯誤'; return;
+            }
 
             // 從 Supabase 刪除三張表的數據
-            await _supabase.from('user_data').delete().eq('username', username);
+            await dbProxy({ mode: 'device', deviceId: getDeviceId(), table: 'user_data', action: 'delete', filters: [{ type: 'eq', column: 'username', value: username }] }).catch(e => console.warn('user_data delete error:', e));
             await _supabase.from('device_map').delete().eq('username', username);
             await _supabase.from('accounts').delete().eq('username', username);
+
+            // 清除本機緩存
+            localStorage.removeItem(CACHE_KEY_PREFIX + username);
 
             // 從內存移除
             delete accounts[username];
@@ -2042,10 +2437,37 @@
             education: { name: '教育', icon: '📚', color: '#06b6d4' },
             other: { name: '其他', icon: '📦', color: '#6b7280' }
         };
+        // 自定義分類
+        let customExpenseCats = [];
+        let customIncomeCats = [];
         // 中文類別名→英文key反向查找（AI可能用中文名）
         const CAT_NAME_TO_KEY = Object.fromEntries(Object.entries(CATEGORIES).map(([k,v])=>[v.name, k]));
-
-        function resolveCategoryKey(key) { return CATEGORIES[key] ? key : CAT_NAME_TO_KEY[key]; }
+        let CUSTOM_CAT_NAME_TO_KEY = {};
+        function rebuildCustomNameToKey() {
+            CUSTOM_CAT_NAME_TO_KEY = {};
+            customExpenseCats.forEach(c => CUSTOM_CAT_NAME_TO_KEY[c.name] = c.key);
+            customIncomeCats.forEach(c => CUSTOM_CAT_NAME_TO_KEY[c.name] = c.key);
+        }
+        function resolveCategoryKey(key) {
+            if (CATEGORIES[key]) return key;
+            if (CAT_NAME_TO_KEY[key]) return CAT_NAME_TO_KEY[key];
+            if (CUSTOM_CAT_NAME_TO_KEY[key]) return CUSTOM_CAT_NAME_TO_KEY[key];
+            const all = [...customExpenseCats, ...customIncomeCats];
+            const found = all.find(c => c.key === key || c.name === key);
+            return found ? found.key : null;
+        }
+        function getExpenseCatMap() {
+            const base = { ...CATEGORIES };
+            customExpenseCats.forEach(c => { base[c.key] = { name: c.name, icon: c.icon || '📌', color: c.color || '#6b7280' }; });
+            return base;
+        }
+        function getIncomeCatMap() {
+            const base = { ...INCOME_CATEGORIES };
+            customIncomeCats.forEach(c => { base[c.key] = { name: c.name, icon: c.icon || '📌', color: c.color || '#6b7280' }; });
+            return base;
+        }
+        function getExpenseCats() { return Object.entries(getExpenseCatMap()).map(([k,v]) => ({ key: k, ...v })); }
+        function getIncomeCats() { return Object.entries(getIncomeCatMap()).map(([k,v]) => ({ key: k, ...v })); }
 
         const DEFAULT_BUDGET = {
             food: 2000, transport: 500, shopping: 1000,
@@ -2061,12 +2483,21 @@
             transfer: { name: '轉賬收入', icon: '🔄', color: '#3b82f6' },
             other_income: { name: '其他收入', icon: '💚', color: '#10b981' }
         };
+        
+        // 快捷引用用的陣列
+        const EXPENSE_CATS_BASE = Object.entries(CATEGORIES).map(([k,v]) => ({ key: k, ...v }));
+        const INCOME_CATS_BASE = Object.entries(INCOME_CATEGORIES).map(([k,v]) => ({ key: k, ...v }));
+        function getQuickExpenseCats() { return [...EXPENSE_CATS_BASE, ...customExpenseCats.map(c => ({ key: c.key, name: c.name, icon: c.icon || '📌', color: c.color || '#6b7280' }))]; }
+        function getQuickIncomeCats() { return [...INCOME_CATS_BASE, ...customIncomeCats.map(c => ({ key: c.key, name: c.name, icon: c.icon || '📌', color: c.color || '#6b7280' }))]; }
 
+        let currentEntryType = 'expense';
         let expenses = [];
         let budgetData = { default: { ...DEFAULT_BUDGET }, monthly: {} };
         let budgetHistory = [];
         let categoryChart = null;
-        let trendChart = null;
+        let incomeCategoryChart = null;
+        let expenseTrendChart = null;
+        let incomeTrendChart = null;
         let selectedCategory = 'food';
         let chatHistory = [];
 
@@ -2098,44 +2529,90 @@
         
 
 // ==================== 安全管理系統 ====================
-// Admin PBKDF2 hash. Format: iterations:salt_len:salt_b64:hash_hex
-const ADMIN_HASH = '200000:14:Q2xhd1NlY3VyZTIwMjY=:0642fa30fed4c632f59966b4c6ad405defbeae1b2dd14218388db91c5d318c00';
-const SECURITY_SALT = 'ClawSecure2026';
 let isLocked = false;
 
-// 管理員密碼驗證（4 層 SHA-256 多重加密比對）
+// 管理員密碼驗證（透過 auth-proxy Edge Function，username=__admin__）
 async function verifyAdminPassword(pwd) {
     try {
-        const parts = ADMIN_HASH.split(':');
-        if (parts.length === 4) {
-            const iterations = parseInt(parts[0]);
-            const saltLen = parseInt(parts[1]);
-            const saltB64 = parts[2];
-            const storedHash = parts[3];
-            const salt = Uint8Array.from(atob(saltB64), c => c.charCodeAt(0)).slice(0, saltLen);
+        // 先取管理員的 client salt
+        const saltResult = await authProxy({ action: 'get_client_salt', username: '__admin__' });
+        if (!saltResult.success) return false;
+        let clientHash;
+        if (saltResult.clientSalt) {
+            clientHash = await pbkdf2(pwd, saltResult.clientSalt);
+        } else {
+            // 舊帳號兼容
             const enc = new TextEncoder();
-            const keyMaterial = await crypto.subtle.importKey(
-                'raw', enc.encode(pwd), 'PBKDF2', false, ['deriveBits']
-            );
+            const keyMaterial = await crypto.subtle.importKey('raw', enc.encode(pwd), 'PBKDF2', false, ['deriveBits']);
             const bits = await crypto.subtle.deriveBits(
-                { name: 'PBKDF2', hash: 'SHA-256', salt: salt, iterations: iterations },
+                { name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode('_costControl_2024'), iterations: 200000 },
                 keyMaterial, 256
             );
             const arr = Array.from(new Uint8Array(bits));
-            const computed = arr.map(b => b.toString(16).padStart(2, '0')).join('');
-            return computed === storedHash;
+            clientHash = arr.map(b => b.toString(16).padStart(2, '0')).join('');
         }
-        let h = pwd + SECURITY_SALT;
-        for (let i = 0; i < 4; i++) { h = jsSHA256(h); }
-        return h === ADMIN_HASH;
-    } catch(e) { return false; }
+        const loginResult = await authProxy({ action: 'login', username: '__admin__', clientHash });
+        return loginResult.success === true;
+    } catch(e) { console.warn('verifyAdminPassword error:', e); return false; }
 }
 
 // （每分鐘掃描已移除）
 
-// 用管理員密碼雜湊加密數據（XOR 三重）
+// 用隨機 salt 派生 AES 加密金鑰（salt 存 localstorage）
+
+// ==================== 本地緩存加密 ====================
+let _localEncKey = null;
+async function getLocalEncryptKey() {
+    if (_localEncKey) return _localEncKey;
+    const saltStr = getEncryptSalt();
+    const enc = new TextEncoder();
+    const salt = enc.encode(saltStr);
+    const keyMaterial = await crypto.subtle.importKey(
+        'raw', enc.encode('QClawLocalCache@2026'), 'PBKDF2', false, ['deriveKey']
+    );
+    _localEncKey = await crypto.subtle.deriveKey(
+        { name: 'PBKDF2', hash: 'SHA-256', salt: salt, iterations: 100000 },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+    return _localEncKey;
+}
+async function encryptLocalData(dataObj) {
+    const key = await getLocalEncryptKey();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(JSON.stringify(dataObj));
+    const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, encoded);
+    const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+    combined.set(iv);
+    combined.set(new Uint8Array(ciphertext), iv.length);
+    return btoa(String.fromCharCode(...combined));
+}
+async function decryptLocalData(encrypted) {
+    try {
+        const key = await getLocalEncryptKey();
+        const combined = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+        const iv = combined.slice(0, 12);
+        const ciphertext = combined.slice(12);
+        const decrypted = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, ciphertext);
+        return JSON.parse(new TextDecoder().decode(decrypted));
+    } catch(e) { return null; }
+}
+
+function getEncryptSalt() {
+    let s = localStorage.getItem('__encrypt_salt');
+    if (!s) {
+        const bytes = new Uint8Array(32);
+        crypto.getRandomValues(bytes);
+        s = btoa(String.fromCharCode(...bytes));
+        localStorage.setItem('__encrypt_salt', s);
+    }
+    return s;
+}
+
 async function deriveEncryptKey(password) {
-    const saltStr = 'ClawSecure2026';
+    const saltStr = getEncryptSalt();
     const enc = new TextEncoder();
     const salt = enc.encode(saltStr);
     const keyMaterial = await crypto.subtle.importKey(
@@ -2285,6 +2762,7 @@ function checkLockOnBoot() {
             loadData();
             loadBudgets();
             loadBudgetHistory();
+            loadCustomCats();
             loadChatHistory();
             document.getElementById('date').value = new Date().toISOString().split('T')[0];
             renderCategoryTags();
@@ -2322,6 +2800,77 @@ function checkLockOnBoot() {
             const ud = getCloudUserData();
             if (ud && ud.budgetHistory) budgetHistory = ud.budgetHistory;
         }
+        function loadCustomCats() {
+            const ud = getCloudUserData();
+            if (ud) {
+                customExpenseCats = Array.isArray(ud.customExpenseCats) ? ud.customExpenseCats : [];
+                customIncomeCats = Array.isArray(ud.customIncomeCats) ? ud.customIncomeCats : [];
+            }
+            rebuildCustomNameToKey();
+        }
+        function saveCustomCats() {
+            const ud = getCloudUserData();
+            if (ud) { ud.customExpenseCats = customExpenseCats; ud.customIncomeCats = customIncomeCats; }
+            saveLocalCache(); syncAfterMutation();
+        }
+        function showAddCustomCat() {
+            const overlay = document.createElement('div');
+            overlay.className = 'modal-overlay';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = '<div style="background:var(--bg);padding:24px;border-radius:16px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">' +
+                '<h3 style="margin:0 0 16px;">新增自定義分類</h3>' +
+                '<div class="form-group"><label>分類名稱</label><input type="text" id="customCatName" placeholder="如：寵物、禮物" style="width:100%;"></div>' +
+                '<div class="form-group"><label>Emoji 圖標</label><input type="text" id="customCatIcon" placeholder="如：🐶 🎁" style="width:100%;" maxlength="4"></div>' +
+                '<div class="form-group"><label>顏色</label><div style="display:flex;gap:6px;flex-wrap:wrap;" id="colorPicker">' +
+                ['#ef4444','#f59e0b','#10b981','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#6b7280'].map((c, ci) =>
+                    '<div style="width:28px;height:28px;border-radius:50%;background:'+c+';cursor:pointer;border:2px solid transparent;" data-color="'+c+'" onclick="pickCatColor(this,'+ci+')"></div>'
+                ).join('') + '</div>' +
+                '<input type="hidden" id="customCatColor" value="#10b981">' +
+                '<div style="display:flex;gap:8px;margin-top:16px;">' +
+                '<button id="customCatCancelBtn" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:12px;background:transparent;color:var(--text);cursor:pointer;">取消</button>' +
+                '<button onclick="confirmAddCustomCat()" style="flex:1;padding:10px;border:none;border-radius:12px;background:var(--primary);color:#fff;cursor:pointer;">✅ 新增</button>' +
+                '</div></div>';
+            document.body.appendChild(overlay);
+            document.getElementById('customCatCancelBtn')?.addEventListener('click', () => overlay.remove());
+            setTimeout(() => document.getElementById('customCatName')?.focus(), 100);
+        }
+        const CAT_COLORS = ['#ef4444','#f59e0b','#10b981','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#6b7280'];
+        function pickCatColor(el, colorIdx) {
+            el.parentElement.querySelectorAll('div').forEach(d => d.style.borderColor = 'transparent');
+            el.style.borderColor = '#fff';
+            document.getElementById('customCatColor').value = CAT_COLORS[colorIdx];
+        }
+        function confirmAddCustomCat() {
+            const name = document.getElementById('customCatName')?.value?.trim();
+            const icon = document.getElementById('customCatIcon')?.value?.trim() || '📌';
+            const color = document.getElementById('customCatColor')?.value || '#6b7280';
+            if (!name) { showToast('請輸入分類名稱'); return; }
+            const isIncome = currentEntryType === 'income';
+            const key = 'custom_' + Date.now();
+            const cat = { key, name, icon, color };
+            if (isIncome) { customIncomeCats.push(cat); } else { customExpenseCats.push(cat); }
+            rebuildCustomNameToKey();
+            saveCustomCats();
+            document.querySelector('.modal-overlay')?.remove();
+            renderCategoryTags();
+            showToast('✅ 已新增分類：' + icon + ' ' + name);
+        }
+        function deleteCustomCat(key) {
+            if (!confirm('確定刪除自定義分類？')) return;
+            const isIncome = currentEntryType === 'income';
+            const arr = isIncome ? customIncomeCats : customExpenseCats;
+            const idx = arr.findIndex(c => c.key === key);
+            if (idx >= 0) { arr.splice(idx, 1); rebuildCustomNameToKey(); saveCustomCats(); }
+            expenses.forEach(e => {
+                if (!isIncome && !e.isIncome && e.category === key) e.category = 'other';
+                if (isIncome && e.isIncome && e.category === key) e.category = 'other_income';
+            });
+            saveData();
+            renderCategoryTags();
+            if (document.getElementById('quickCategoryTags')) initQuickCategoryTags();
+            updateAll();
+            showToast('已刪除分類');
+        }
 
         function saveData() { const ud = getCloudUserData(); if (ud) ud.expenses = expenses; saveLocalCache(); syncAfterMutation(); }
         function saveBudgets() { const ud = getCloudUserData(); if (ud) ud.budgets = budgetData; saveLocalCache(); syncAfterMutation(); }
@@ -2343,16 +2892,35 @@ function checkLockOnBoot() {
         }
 
         // ==================== 分類標籤 ====================
+        
         function renderCategoryTags() {
             const container = document.getElementById('categoryTags');
-            container.innerHTML = Object.entries(CATEGORIES).map(([key, cat]) => `
-                <div class="category-tag ${key === selectedCategory ? 'active' : ''}"
+            const catMap = currentEntryType === 'income' ? getIncomeCatMap() : getExpenseCatMap();
+            container.innerHTML = Object.entries(catMap).map(([key, cat]) => {
+                const isCustom = (currentEntryType === 'income' ? customIncomeCats : customExpenseCats).some(c => c.key === key);
+                const delBtn = isCustom ? `<span class="cat-del" onclick="event.stopPropagation();deleteCustomCat('${key}')" title="刪除分類">✕</span>` : '';
+                return `<div class="category-tag ${key === selectedCategory ? 'active' : ''}"
                      style="background: ${cat.color}20; color: ${cat.color}"
                      onclick="selectCategory('${key}')">
-                    ${cat.icon} ${cat.name}
-                </div>
-            `).join('');
+                    ${cat.icon} ${cat.name}${delBtn}
+                </div>`;
+            }).join('');
+            container.innerHTML += `<div class="category-tag cat-add-btn" onclick="showAddCustomCat()">
+                <span style="font-weight:bold;font-size:16px;">+</span> 自定義
+            </div>`;
             document.getElementById('category').value = selectedCategory;
+        }
+        
+        function switchMainType(type) {
+            currentEntryType = type;
+            document.getElementById('mainExpenseBtn').classList.toggle('active', type === 'expense');
+            document.getElementById('mainIncomeBtn').classList.toggle('active', type === 'income');
+            // 重置分類選擇
+            selectedCategory = '';
+            renderCategoryTags();
+            // 修改提交按鈕文字
+            const btn = document.querySelector('#expenseForm .btn-primary');
+            btn.textContent = type === 'income' ? '💾 保存收入' : '💾 保存支出';
         }
 
         function selectCategory(cat) {
@@ -2363,12 +2931,16 @@ function checkLockOnBoot() {
         // ==================== 添加支出 ====================
         function addExpense(e) {
             e.preventDefault();
+            const isIncome = currentEntryType === 'income';
+            const noteVal = document.getElementById('note').value || '';
             const expense = {
                 id: Date.now(),
                 category: document.getElementById('category').value,
-                amount: parseFloat(document.getElementById('amount').value),
+                amount: inputAmount(document.getElementById('amount').value),
                 date: document.getElementById('date').value,
-                note: document.getElementById('note').value || '',
+                note: noteVal + (isIncome ? ' [收入]' : ''),
+                isIncome: isIncome,
+                currency: currentCurrency,
                 created: Date.now()
             };
             expenses.unshift(expense);
@@ -2405,7 +2977,8 @@ function checkLockOnBoot() {
             if (!expense) return;
             const oldCategory = expense.category;
             const newCategory = document.getElementById('edit-cat-' + id).value;
-            const newAmount = parseFloat(document.getElementById('edit-amount-' + id).value);
+            const editCur = document.getElementById('edit-currency-' + id).value || 'MOP';
+            const newAmount = inputAmountWith(document.getElementById('edit-amount-' + id).value, editCur);
             const newDate = document.getElementById('edit-date-' + id).value;
             const newNote = document.getElementById('edit-note-' + id).value.trim();
             if (isNaN(newAmount) || newAmount <= 0) { showToast('⚠️ 金額必須大於0'); return; }
@@ -2417,6 +2990,7 @@ function checkLockOnBoot() {
 
             expense.category = newCategory;
             expense.amount = newAmount;
+            expense.currency = editCur;
             expense.date = newDate;
             expense.note = newNote;
             expense.modified = Date.now();
@@ -2431,10 +3005,50 @@ function checkLockOnBoot() {
             document.getElementById('edit-form-' + id).style.display = 'none';
         }
 
+        // ===== 收入編輯與刪除 =====
+        function deleteIncome(id) {
+            if (confirm('確定要刪除這條收入嗎？')) {
+                expenses = expenses.filter(e => e.id !== id);
+                saveData();
+                updateAll();
+            }
+        }
+
+        function editIncome(id) {
+            const form = document.getElementById('edit-form-' + id);
+            if (form) form.style.display = (form.style.display === 'none' || !form.style.display) ? 'block' : 'none';
+        }
+
+        function saveEditIncome(id) {
+            const expense = expenses.find(e => e.id === id);
+            if (!expense) return;
+            const cur = document.getElementById('edit-income-cur-' + id).value || 'MOP';
+            const newAmount = inputAmountWith(document.getElementById('edit-income-amt-' + id).value, cur);
+            const newCategory = document.getElementById('edit-income-cat-' + id).value;
+            const newDate = document.getElementById('edit-income-date-' + id).value;
+            const newNote = document.getElementById('edit-income-note-' + id).value.trim();
+            if (isNaN(newAmount) || newAmount <= 0) { showToast('⚠️ 金額必須大於0'); return; }
+            expense.amount = newAmount;
+            expense.currency = cur;
+            expense.category = newCategory;
+            expense.date = newDate;
+            expense.note = newNote;
+            expense.modified = Date.now();
+            saveData();
+            updateAll();
+            document.getElementById('edit-form-' + id).style.display = 'none';
+            showToast('✅ 已更新');
+        }
+
+        function cancelEditIncome(id) {
+            document.getElementById('edit-form-' + id).style.display = 'none';
+        }
+
         // ==================== 更新視圖 ====================
         function updateAll() {
             updateStats();
             renderExpenseList();
+            renderIncomeList();
             renderBudgetList();
             updateRemainDisplay();
             updateCharts();
@@ -2462,7 +3076,7 @@ function checkLockOnBoot() {
 
             const todayTotal = expenses.filter(e => e.date === today).reduce((s, e) => s + e.amount, 0);
             const yesterday = formatDate(new Date(now - 86400000));
-            const yesterdayTotal = expenses.filter(e => e.date === yesterday).reduce((s, e) => s + e.amount, 0);
+            const yesterdayTotal = expenses.filter(e => e.date === yesterday && !e.isIncome).reduce((s, e) => s + e.amount, 0);
 
             const currentBudget = getBudgetForMonth(monthKey);
             const totalBudget = Object.values(currentBudget).reduce((s, v) => s + v, 0);
@@ -2481,7 +3095,7 @@ function checkLockOnBoot() {
             document.getElementById('monthChange').textContent = monthChange >= 0 ? `↗ +${monthChange.toFixed(1)}% 環比` : `↘ ${monthChange.toFixed(1)}% 環比`;
             document.getElementById('monthChange').className = `stat-change ${monthChange >= 0 ? 'up' : 'down'}`;
 
-            document.getElementById('budgetStatus').textContent = budgetLeft >= 0 ? `剩餘 ${(budgetLeft/totalBudget*100).toFixed(1)}%` : `超支 ${Math.abs(budgetLeft).toFixed(2)}`;
+            document.getElementById('budgetStatus').textContent = budgetLeft >= 0 ? `剩餘 ${(budgetLeft/totalBudget*100).toFixed(1)}%` : `超支 ${fmt(Math.abs(budgetLeft))}`;
             document.getElementById('budgetStatus').className = `stat-change ${budgetLeft >= 0 ? 'down' : 'up'}`;
 
             const todayChange = yesterdayTotal > 0 ? ((todayTotal - yesterdayTotal) / yesterdayTotal * 100) : 0;
@@ -2490,6 +3104,48 @@ function checkLockOnBoot() {
 
             document.getElementById('avgStatus').textContent = projectedTotal > totalBudget ? '預計超支 ' + fmt0(projectedTotal - totalBudget) : '預算內';
             document.getElementById('avgStatus').className = `stat-change ${projectedTotal > totalBudget ? 'up' : 'down'}`;
+
+            // ===== 收入統計 =====
+            const monthIncomeExpenses = expenses.filter(e => e.isIncome === true && (() => { const d = new Date(e.date); return d.getMonth() === thisMonth && d.getFullYear() === thisYear; })());
+            const monthIncome = monthIncomeExpenses.reduce((s, e) => s + e.amount, 0);
+            const todayIncome = expenses.filter(e => e.isIncome === true && e.date === today).reduce((s, e) => s + e.amount, 0);
+            const avgIncome = monthIncome / dayOfMonth;
+            const netBalance = monthIncome - monthTotal; // monthTotal already excludes income
+
+            // 環比計算
+            const lastMonthIncomeExpenses = expenses.filter(e => e.isIncome === true && (() => { const d = new Date(e.date); return d.getMonth() === (thisMonth - 1 + 12) % 12 && d.getFullYear() === (thisMonth === 0 ? thisYear - 1 : thisYear); })());
+            const lastMonthIncome = lastMonthIncomeExpenses.reduce((s, e) => s + e.amount, 0);
+            const yesterdayIncome = expenses.filter(e => e.isIncome === true && e.date === yesterday).reduce((s, e) => s + e.amount, 0);
+            const lastAvgIncome = lastMonthIncome > 0 ? lastMonthIncome / daysInMonth : 0;
+
+            document.getElementById('monthIncome').textContent = fmt(monthIncome);
+            document.getElementById('todayIncome').textContent = fmt(todayIncome);
+            document.getElementById('avgIncome').textContent = fmt(avgIncome);
+            document.getElementById('netBalance').textContent = fmt(netBalance);
+            document.getElementById('netBalance').style.color = netBalance >= 0 ? 'var(--success)' : 'var(--danger)';
+
+            // 環比文本
+            const incPct = lastMonthIncome > 0 ? ((monthIncome - lastMonthIncome) / lastMonthIncome * 100) : 0;
+            const monthIncEl = document.getElementById('monthIncomeChange');
+            if (monthIncEl) { monthIncEl.textContent = incPct >= 0 ? `↗ +${incPct.toFixed(1)}% 環比` : `↘ ${incPct.toFixed(1)}% 環比`;
+                monthIncEl.className = `stat-change ${incPct >= 0 ? 'up' : 'down'}`; }
+
+            const todayIncPct = yesterdayIncome > 0 ? ((todayIncome - yesterdayIncome) / yesterdayIncome * 100) : 0;
+            const todayIncEl = document.getElementById('todayIncomeChange');
+            if (todayIncEl) { todayIncEl.textContent = todayIncPct >= 0 ? `↗ +${todayIncPct.toFixed(1)}% 環比` : `↘ ${todayIncPct.toFixed(1)}% 環比`;
+                todayIncEl.className = `stat-change ${todayIncPct >= 0 ? 'up' : 'down'}`; }
+
+            const avgIncPct = lastAvgIncome > 0 ? ((avgIncome - lastAvgIncome) / lastAvgIncome * 100) : 0;
+            const avgIncEl = document.getElementById('avgIncomeChange');
+            if (avgIncEl) { avgIncEl.textContent = avgIncPct >= 0 ? `↗ +${avgIncPct.toFixed(1)}% 環比` : `↘ ${avgIncPct.toFixed(1)}% 環比`;
+                avgIncEl.className = `stat-change ${avgIncPct >= 0 ? 'up' : 'down'}`; }
+
+            // 淨收支顯示最後一個月的變化
+            const lastNetBalance = lastMonthIncome - lastMonthTotal;
+            const netPct = lastNetBalance !== 0 ? ((netBalance - lastNetBalance) / Math.abs(lastNetBalance) * 100) : 0;
+            const netEl = document.getElementById('netBalanceChange');
+            if (netEl) { netEl.textContent = netPct >= 0 ? `↗ +${netPct.toFixed(1)}%` : `↘ ${netPct.toFixed(1)}%`;
+                netEl.className = `stat-change ${netPct >= 0 ? 'up' : 'down'}`; }
         }
 
         // ==================== 預算系統 ====================
@@ -2551,7 +3207,7 @@ function checkLockOnBoot() {
             const monthKey = document.getElementById('remainMonth').value;
             if (!monthKey) return;
             const [year, month] = monthKey.split('-').map(Number);
-            const monthExpenses = expenses.filter(e => e.date.startsWith(monthKey));
+            const monthExpenses = expenses.filter(e => e.date.startsWith(monthKey) && !e.isIncome);
             const monthTotal = monthExpenses.reduce((s, e) => s + e.amount, 0);
             const currentBudget = getBudgetForMonth(monthKey);
             const totalBudget = Object.values(currentBudget).reduce((s, v) => s + v, 0);
@@ -2585,7 +3241,7 @@ function checkLockOnBoot() {
             `;
 
             const categoryTotals = {};
-            monthExpenses.forEach(e => { categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount; });
+            monthExpenses.forEach(e => { if (!e.isIncome) categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount; });
             const detail = document.getElementById('remainDetail');
             detail.innerHTML = '<div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text-secondary)">分類剩餘預算</div>' +
                 Object.entries(CATEGORIES).map(([key, cat]) => {
@@ -2607,7 +3263,7 @@ function checkLockOnBoot() {
         function renderFilterOptions() {
             const catSelect = document.getElementById('filterCategory');
             catSelect.innerHTML = '<option value="">全部分類</option>' +
-                Object.entries(CATEGORIES).map(([key, cat]) => `<option value="${key}">${cat.icon} ${cat.name}</option>`).join('');
+                Object.entries(getExpenseCatMap()).map(([key, cat]) => `<option value="${key}">${cat.icon} ${cat.name}</option>`).join('');
             const months = [...new Set(expenses.map(e => e.date.substring(0, 7)))].sort().reverse();
             const monthSelect = document.getElementById('filterMonth');
             monthSelect.innerHTML = '<option value="">全部月份</option>' +
@@ -2619,18 +3275,20 @@ function checkLockOnBoot() {
             const monthFilter = document.getElementById('filterMonth').value;
             const searchText = document.getElementById('searchText').value.toLowerCase();
             let filtered = expenses.filter(e => {
+                if (e.isIncome) return false;
                 if (catFilter && e.category !== catFilter) return false;
                 if (monthFilter && !e.date.startsWith(monthFilter)) return false;
                 if (searchText && !e.note.toLowerCase().includes(searchText)) return false;
                 return true;
             });
+            filtered.sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
             const container = document.getElementById('expenseList');
             if (filtered.length === 0) {
                 container.innerHTML = `<div class="empty-state"><div class="icon">📭</div><div>暫無支出記錄</div></div>`;
                 return;
             }
             container.innerHTML = filtered.map(e => {
-                const cat = CATEGORIES[e.category];
+                const cat = getExpenseCatMap()[e.category] || CATEGORIES[e.category];
                 const sign = e.isIncome ? '+' : '-';
                 const amtColor = e.isIncome ? 'var(--success)' : (cat ? cat.color : '#6b7280');
                 const icon = cat ? cat.icon : '📦';
@@ -2638,10 +3296,10 @@ function checkLockOnBoot() {
                 return `<div class="expense-item">
                     <div class="expense-icon" style="background:${cat?cat.color+'20':'#6b728020'};color:${amtColor}">${icon}</div>
                     <div class="expense-info">
-                        <div class="expense-name">${catName} ${e.note ? '- ' + e.note : ''}</div>
+                        <div class="expense-name">${catName} ${e.note ? '- ' + escH(e.note) : ''}</div>
                         <div class="expense-meta">${e.date}</div>
                     </div>
-                    <div class="expense-amount" style="color:${amtColor}">${sign}${fmt(e.amount)}</div>
+                    <div class="expense-amount" style="color:${amtColor}">${sign}${fmtWith(e.amount, e.currency || 'MOP')}</div>
                     <div class="expense-actions">
                         <button onclick="editExpense(${e.id})" style="background:#dbeafe;color:#3b82f6;margin-right:4px;">✏️</button>
                         <button onclick="deleteExpense(${e.id})" style="background:#fee2e2;color:#ef4444;">刪除</button>
@@ -2649,11 +3307,67 @@ function checkLockOnBoot() {
                 </div>
                 <div id="edit-form-${e.id}" class="edit-expense-form" style="display:none;padding:10px 12px;margin:0 12px 8px;background:var(--card-bg);border-radius:12px;border:1px solid var(--border);">
                     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:end;">
-                        <div style="flex:1;min-width:80px;"><label style="font-size:11px;color:var(--text-secondary);">金額</label><input type="number" id="edit-amount-${e.id}" value="${e.amount}" step="0.01" min="0" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
+                        <div style="flex:0 0 auto;min-width:70px;"><label style="font-size:11px;color:var(--text-secondary);">幣種</label><select id="edit-currency-${e.id}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"><option value="MOP" ${(e.currency||'MOP')==='MOP'?'selected':''}>MOP$</option><option value="CNY" ${(e.currency||'MOP')==='CNY'?'selected':''}>¥</option><option value="USD" ${(e.currency||'MOP')==='USD'?'selected':''}>US$</option></select></div>
+                        <div style="flex:1;min-width:80px;"><label style="font-size:11px;color:var(--text-secondary);">金額</label><input type="number" id="edit-amount-${e.id}" value="${fmtWith(e.amount, e.currency || 'MOP', 2).replace(/^[^0-9]*/, '')}" step="0.01" min="0" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
                         <div style="flex:1;min-width:100px;"><label style="font-size:11px;color:var(--text-secondary);">分類</label><select id="edit-cat-${e.id}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);">${buildCategoryOptions(e.category, !!e.isIncome)}</select></div>
                         <div style="flex:1;min-width:120px;"><label style="font-size:11px;color:var(--text-secondary);">日期</label><input type="date" id="edit-date-${e.id}" value="${e.date}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
                         <div style="flex:2;min-width:100px;"><label style="font-size:11px;color:var(--text-secondary);">備註</label><input type="text" id="edit-note-${e.id}" value="${escapeHtml(e.note||'')}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
                         <div style="display:flex;gap:4px;"><button onclick="saveEditExpense(${e.id})" style="padding:6px 12px;border-radius:8px;border:none;background:var(--primary);color:white;cursor:pointer;font-size:13px;">✅ 保存</button><button onclick="cancelEditExpense(${e.id})" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);cursor:pointer;font-size:13px;">✕ 取消</button></div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function getIncomeMonths() {
+            const months = new Set();
+            expenses.filter(e => e.isIncome).forEach(e => months.add(e.date.substring(0, 7)));
+            return [...months].sort().reverse();
+        }
+
+        function renderIncomeList() {
+            const sel = document.getElementById('filterIncomeMonth');
+            const currentVal = sel.value;
+            const months = getIncomeMonths();
+            sel.innerHTML = '<option value="">全部月份</option>' + months.map(m => `<option value="${m}" ${m === currentVal ? 'selected' : ''}>${m}</option>`).join('');
+            const monthFilter = sel.value;
+            const searchText = document.getElementById('searchIncomeText').value.toLowerCase();
+            let filtered = expenses.filter(e => {
+                if (!e.isIncome) return false;
+                if (monthFilter && !e.date.startsWith(monthFilter)) return false;
+                if (searchText && !e.note.toLowerCase().includes(searchText)) return false;
+                return true;
+            });
+            // Sort descending by date (newest first), then by id
+            filtered.sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+            const container = document.getElementById('incomeList');
+            if (filtered.length === 0) {
+                container.innerHTML = `<div class="empty-state"><div class="icon">📭</div><div>暫無收入記錄</div></div>`;
+                return;
+            }
+            container.innerHTML = filtered.map(e => {
+                const cat = getIncomeCatMap()[e.category] || INCOME_CATEGORIES[e.category] || { icon: '💰', name: '收入', color: '#22c55e' };
+                const icon = cat.icon;
+                const catName = cat.name;
+                return `<div class="expense-item">
+                    <div class="expense-icon" style="background:${cat.color}20;color:${cat.color}">${icon}</div>
+                    <div class="expense-info">
+                        <div class="expense-name">${catName} ${e.note ? '- ' + escH(e.note) : ''}</div>
+                        <div class="expense-meta">${e.date}</div>
+                    </div>
+                    <div class="expense-amount" style="color:var(--success)">+${fmtWith(e.amount, e.currency || 'MOP')}</div>
+                    <div class="expense-actions">
+                        <button onclick="editIncome(${e.id})" style="background:#dbeafe;color:#3b82f6;margin-right:4px;">✏️</button>
+                        <button onclick="deleteIncome(${e.id})" style="background:#fee2e2;color:#ef4444;">刪除</button>
+                    </div>
+                </div>
+                <div id="edit-form-${e.id}" class="edit-expense-form" style="display:none;padding:10px 12px;margin:0 12px 8px;background:var(--card-bg);border-radius:12px;border:1px solid var(--border);">
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:end;">
+                        <div style="flex:0 0 auto;min-width:70px;"><label style="font-size:11px;color:var(--text-secondary);">幣種</label><select id="edit-income-cur-${e.id}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"><option value="MOP" ${(e.currency||'MOP')==='MOP'?'selected':''}>MOP$</option><option value="CNY" ${(e.currency||'MOP')==='CNY'?'selected':''}>¥</option><option value="USD" ${(e.currency||'MOP')==='USD'?'selected':''}>US$</option></select></div>
+                        <div style="flex:1;min-width:80px;"><label style="font-size:11px;color:var(--text-secondary);">金額</label><input type="number" id="edit-income-amt-${e.id}" value="${fmtWith(e.amount, e.currency || 'MOP', 2).replace(/^[^0-9]*/, '')}" step="0.01" min="0" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
+                        <div style="flex:1;min-width:100px;"><label style="font-size:11px;color:var(--text-secondary);">分類</label><select id="edit-income-cat-${e.id}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);">${buildCategoryOptions(e.category, true)}</select></div>
+                        <div style="flex:1;min-width:120px;"><label style="font-size:11px;color:var(--text-secondary);">日期</label><input type="date" id="edit-income-date-${e.id}" value="${e.date}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
+                        <div style="flex:2;min-width:100px;"><label style="font-size:11px;color:var(--text-secondary);">備註</label><input type="text" id="edit-income-note-${e.id}" value="${escapeHtml(e.note||'')}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
+                        <div style="display:flex;gap:4px;"><button onclick="saveEditIncome(${e.id})" style="padding:6px 12px;border-radius:8px;border:none;background:var(--primary);color:white;cursor:pointer;font-size:13px;">✅ 保存</button><button onclick="cancelEditIncome(${e.id})" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);cursor:pointer;font-size:13px;">✕ 取消</button></div>
                     </div>
                 </div>`;
             }).join('');
@@ -2665,11 +3379,11 @@ function checkLockOnBoot() {
             const thisMonth = now.getMonth();
             const thisYear = now.getFullYear();
             const monthKey = `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}`;
-            const monthExpenses = expenses.filter(e => e.date.startsWith(monthKey));
+            const monthExpenses = expenses.filter(e => e.date.startsWith(monthKey) && !e.isIncome);
             const categoryTotals = {};
-            monthExpenses.forEach(e => { categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount; });
+            monthExpenses.forEach(e => { if (!e.isIncome) categoryTotals[e.category] = (categoryTotals[e.category] || 0) + e.amount; });
             const currentBudget = getBudgetForMonth(monthKey);
-            document.getElementById('budgetList').innerHTML = Object.entries(CATEGORIES).map(([key, cat]) => {
+            document.getElementById('budgetList').innerHTML = Object.entries(getExpenseCatMap()).map(([key, cat]) => {
                 const spent = categoryTotals[key] || 0;
                 const budget = currentBudget[key] || 0;
                 const pct = budget > 0 ? (spent / budget * 100) : 0;
@@ -2699,7 +3413,7 @@ function checkLockOnBoot() {
         function onBudgetMonthChange() {
             const monthKey = document.getElementById('budgetMonthSelect').value;
             const currentBudget = getBudgetForMonth(monthKey);
-            document.getElementById('budgetForm').innerHTML = Object.entries(CATEGORIES).map(([key, cat]) =>
+            document.getElementById('budgetForm').innerHTML = Object.entries(getExpenseCatMap()).map(([key, cat]) =>
                 `<div class="form-group"><label>${cat.icon} ${cat.name}</label>
                 <input type="number" id="budget_${key}" value="${currentBudget[key]||0}" min="0" step="10"></div>`
             ).join('');
@@ -2711,7 +3425,7 @@ function checkLockOnBoot() {
             const newBudget = {};
             Object.keys(CATEGORIES).forEach(key => {
                 const val = document.getElementById('budget_' + key)?.value;
-                if (val !== undefined) newBudget[key] = parseFloat(val) || 0;
+                if (val !== undefined) newBudget[key] = inputAmount(val) || 0;
             });
             setBudgetForMonth(monthKey || null, newBudget);
             closeBudgetModal();
@@ -2745,47 +3459,197 @@ function checkLockOnBoot() {
         function closeBudgetHistoryModal() { document.getElementById('budgetHistoryModal').classList.remove('active'); }
 
         // ==================== 圖表 ====================
-        function updateCharts() { updateCategoryChart(); updateTrendChart(); }
+        function updateCharts() { updateCategoryChart(); updateIncomeCategoryChart(); updateExpenseTrend(); updateIncomeTrend(); }
 
         function updateCategoryChart() {
             const now = new Date();
             const thisMonth = now.getMonth();
             const thisYear = now.getFullYear();
-            const monthExpenses = expenses.filter(e => e.date.startsWith(`${thisYear}-${String(thisMonth+1).padStart(2,'0')}`));
-            const totals = {};
-            monthExpenses.forEach(e => { totals[e.category] = (totals[e.category] || 0) + e.amount; });
-            const labels = Object.keys(totals).map(k => CATEGORIES[k].name);
-            const data = Object.values(totals);
-            const colors = Object.keys(totals).map(k => CATEGORIES[k].color);
+            const prefix = `${thisYear}-${String(thisMonth+1).padStart(2,'0')}`;
+            const monthItems = expenses.filter(e => e.date.startsWith(prefix));
+
+            // Expense-only pie chart
+            const expenseTotals = {};
+            monthItems.filter(e => !e.isIncome).forEach(e => {
+                expenseTotals[e.category] = (expenseTotals[e.category] || 0) + e.amount;
+            });
+
+            const expKeys = Object.keys(expenseTotals);
+            const expGrand = Object.values(expenseTotals).reduce((s, v) => s + v, 0);
+
+            const labels = expKeys.map(k => {
+                const cat = getExpenseCatMap()[k] || CATEGORIES[k];
+                const name = cat ? cat.name : k;
+                const val = expenseTotals[k] || 0;
+                const pct = expGrand > 0 ? ((val / expGrand) * 100).toFixed(1) : '0.0';
+                return name + ' ' + pct + '%';
+            });
+            const data = expKeys.map(k => expenseTotals[k] || 0);
+            const colors = expKeys.map(k => {
+                const cat = getExpenseCatMap()[k] || CATEGORIES[k];
+                return cat ? cat.color : '#6b7280';
+            });
+
             const ctx = document.getElementById('categoryChart').getContext('2d');
             if (categoryChart) categoryChart.destroy();
             const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
             categoryChart = new Chart(ctx, {
-                type: 'doughnut', data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0 }] },
-                options: { responsive: true, maintainAspectRatio: false,
-                    plugins: { legend: { position: 'right', labels: { color: isDark ? '#f1f5f9' : '#1e293b', font: { size: 12 }, padding: 15, usePointStyle: true } } } }
+                type: 'doughnut',
+                data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: isDark ? '#1e293b' : '#fff' }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    cutout: '55%',
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: isDark ? '#f1f5f9' : '#1e293b',
+                                font: { size: 12 },
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const val = ctx.parsed;
+                                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                    const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
+                                    return '支出  MOP$' + fmtWith(val, currentCurrency, 2) + '  (' + pct + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
             });
         }
 
-        function updateTrendChart() {
-            const days = parseInt(document.getElementById('trendPeriod').value);
+        function updateIncomeCategoryChart() {
             const now = new Date();
-            const dates = [], amounts = [];
+            const thisMonth = now.getMonth();
+            const thisYear = now.getFullYear();
+            const prefix = `${thisYear}-${String(thisMonth+1).padStart(2,'0')}`;
+            const monthItems = expenses.filter(e => e.date.startsWith(prefix));
+
+            // Income-only pie chart
+            const incomeTotals = {};
+            monthItems.filter(e => e.isIncome).forEach(e => {
+                incomeTotals[e.category] = (incomeTotals[e.category] || 0) + e.amount;
+            });
+
+            const incKeys = Object.keys(incomeTotals);
+            const incGrand = Object.values(incomeTotals).reduce((s, v) => s + v, 0);
+
+            const labels = incKeys.map(k => {
+                const cat = INCOME_CATEGORIES[k];
+                const name = cat ? cat.name : k;
+                const val = incomeTotals[k] || 0;
+                const pct = incGrand > 0 ? ((val / incGrand) * 100).toFixed(1) : '0.0';
+                return name + ' ' + pct + '%';
+            });
+            const data = incKeys.map(k => incomeTotals[k] || 0);
+            const colors = incKeys.map(k => {
+                const cat = INCOME_CATEGORIES[k];
+                return cat ? cat.color : '#22c55e';
+            });
+
+            const ctx = document.getElementById('incomeCategoryChart').getContext('2d');
+            if (incomeCategoryChart) incomeCategoryChart.destroy();
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            incomeCategoryChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: isDark ? '#1e293b' : '#fff' }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    cutout: '55%',
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: isDark ? '#f1f5f9' : '#1e293b',
+                                font: { size: 12 },
+                                padding: 15,
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(ctx) {
+                                    const val = ctx.parsed;
+                                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                    const pct = total > 0 ? ((val / total) * 100).toFixed(1) : '0.0';
+                                    return '收入  MOP$' + fmtWith(val, currentCurrency, 2) + '  (' + pct + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateExpenseTrend() {
+            const days = parseInt(document.getElementById('trendPeriodExp').value);
+            const now = new Date();
+            const dates = [], amts = [];
             for (let i = days - 1; i >= 0; i--) {
                 const d = new Date(now - i * 86400000);
                 const dateStr = formatDate(d);
-                const dayTotal = expenses.filter(e => e.date === dateStr).reduce((s, e) => s + e.amount, 0);
+                const dayTotal = expenses.filter(e => e.date === dateStr && !e.isIncome).reduce((s, e) => s + e.amount, 0);
                 dates.push(dateStr.substring(5));
-                amounts.push(dayTotal);
+                amts.push(dayTotal);
             }
-            const ctx = document.getElementById('trendChart').getContext('2d');
-            if (trendChart) trendChart.destroy();
+            const ctx = document.getElementById('expenseTrendChart').getContext('2d');
+            if (expenseTrendChart) expenseTrendChart.destroy();
             const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-            trendChart = new Chart(ctx, {
-                type: 'bar', data: { labels: dates, datasets: [{ label: '支出金額', data: amounts, backgroundColor: 'rgba(79,70,229,0.6)', borderColor: 'rgba(79,70,229,1)', borderWidth: 1, borderRadius: 4 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
-                    scales: { x: { ticks: { color: isDark ? '#94a3b8' : '#64748b', font: { size: 11 } }, grid: { display: false } },
-                             y: { ticks: { color: isDark ? '#94a3b8' : '#64748b', font: { size: 11 } }, grid: { color: isDark ? '#334155' : '#e2e8f0' } } } }
+            expenseTrendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [{ label: '支出', data: amts, backgroundColor: 'rgba(239,68,68,0.6)', borderColor: 'rgba(239,68,68,1)', borderWidth: 1, borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { stacked: false, ticks: { color: isDark ? '#94a3b8' : '#64748b', font: { size: 11 } }, grid: { display: false } },
+                        y: { stacked: false, ticks: { color: isDark ? '#94a3b8' : '#64748b', font: { size: 11 } }, grid: { color: isDark ? '#334155' : '#e2e8f0' } }
+                    }
+                }
+            });
+        }
+
+        function updateIncomeTrend() {
+            const days = parseInt(document.getElementById('trendPeriodInc').value);
+            const now = new Date();
+            const dates = [], amts = [];
+            for (let i = days - 1; i >= 0; i--) {
+                const d = new Date(now - i * 86400000);
+                const dateStr = formatDate(d);
+                const dayTotal = expenses.filter(e => e.date === dateStr && e.isIncome).reduce((s, e) => s + e.amount, 0);
+                dates.push(dateStr.substring(5));
+                amts.push(dayTotal);
+            }
+            const ctx = document.getElementById('incomeTrendChart').getContext('2d');
+            if (incomeTrendChart) incomeTrendChart.destroy();
+            const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+            incomeTrendChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: dates,
+                    datasets: [{ label: '收入', data: amts, backgroundColor: 'rgba(34,197,94,0.6)', borderColor: 'rgba(34,197,94,1)', borderWidth: 1, borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { stacked: false, ticks: { color: isDark ? '#94a3b8' : '#64748b', font: { size: 11 } }, grid: { display: false } },
+                        y: { stacked: false, ticks: { color: isDark ? '#94a3b8' : '#64748b', font: { size: 11 } }, grid: { color: isDark ? '#334155' : '#e2e8f0' } }
+                    }
+                }
             });
         }
 
@@ -2833,7 +3697,7 @@ function checkLockOnBoot() {
                 );
                 displayAIAdvice(data.choices[0].message.content);
             } catch (err) {
-                content.innerHTML = `<div class="ai-error"><div style="font-size:32px;margin-bottom:12px;">⚠️</div><div>${err.message}</div><div style="margin-top:12px;font-size:13px;color:var(--text-secondary)">提示：請檢查 API 配置是否正確</div></div>`;
+                content.innerHTML = `<div class="ai-error"><div style="font-size:32px;margin-bottom:12px;">⚠️</div><div>${escapeHtml(String(err.message))}</div><div style="margin-top:12px;font-size:13px;color:var(--text-secondary)">提示：請檢查 API 配置是否正確</div></div>`;
             } finally { btn.disabled = false; btn.textContent = '✨ 重新獲取'; }
         }
 
@@ -2842,15 +3706,15 @@ function checkLockOnBoot() {
             const thisMonth = now.getMonth();
             const thisYear = now.getFullYear();
             const monthKey = `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}`;
-            const monthExpenses = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === thisMonth && d.getFullYear() === thisYear; });
+            const monthExpenses = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === thisMonth && d.getFullYear() === thisYear && !e.isIncome; });
             const totalSpent = monthExpenses.reduce((s, e) => s + e.amount, 0);
             const currentBudget = getBudgetForMonth(monthKey);
             const totalBudget = Object.values(currentBudget).reduce((s, v) => s + v, 0);
             const categoryBreakdown = {};
-            monthExpenses.forEach(e => { categoryBreakdown[e.category] = (categoryBreakdown[e.category] || 0) + e.amount; });
+            monthExpenses.forEach(e => { if (!e.isIncome) categoryBreakdown[e.category] = (categoryBreakdown[e.category] || 0) + e.amount; });
             const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
             const lastMonthStr = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`;
-            const lastMonthTotal = expenses.filter(e => e.date.startsWith(lastMonthStr)).reduce((s, e) => s + e.amount, 0);
+            const lastMonthTotal = expenses.filter(e => e.date.startsWith(lastMonthStr) && !e.isIncome).reduce((s, e) => s + e.amount, 0);
             const daysInMonth = new Date(thisYear, thisMonth + 1, 0).getDate();
             const dayOfMonth = now.getDate();
             const projectedTotal = (totalSpent / dayOfMonth) * daysInMonth;
@@ -2933,7 +3797,7 @@ function checkLockOnBoot() {
                     .replace(/\n/g, '<br>');
 
                 html += '<div class="ai-section-card" style="--sc:' + s.color + ';animation-delay:' + (i * 0.08) + 's">' +
-                    '<div class="ai-section-title">' + s.title + '</div>' +
+                    '<div class="ai-section-title">' + escapeHtml(s.title) + '</div>' +
                     '<div class="ai-section-body"><p>' + body + '</p></div></div>';
             }
 
@@ -2980,10 +3844,11 @@ function checkLockOnBoot() {
                             let tb = 0;
                             let items = '';
                             for (const [k,v] of Object.entries(bd)) {
+                                const safeK = String(k).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
                                 const resolvedKey = resolveCategoryKey(k);
                                 const c = resolvedKey ? CATEGORIES[resolvedKey] : null;
                                 if (c && typeof v === 'number') { tb += v; items += `<span style="display:inline-block;margin:2px 6px 2px 0;padding:2px 8px;border-radius:6px;background:${c.color}20;color:${c.color};font-size:12px;">${c.icon} ${c.name} ¥${v}</span>`; }
-                                else if (typeof v === 'number') { tb += v; items += `<span style="display:inline-block;margin:2px 6px 2px 0;padding:2px 8px;border-radius:6px;background:#6b728020;color:#6b7280;font-size:12px;">📦 ${k} ¥${v}</span>`; }
+                                else if (typeof v === 'number') { tb += v; items += `<span style="display:inline-block;margin:2px 6px 2px 0;padding:2px 8px;border-radius:6px;background:#6b728020;color:#6b7280;font-size:12px;">📦 ${escapeHtml(safeK)} ¥${v}</span>`; }
                             }
                             html += `<div class="ai-budget-card"><div style="font-weight:600;margin-bottom:8px;">🎯 AI 預算方案 <span style="font-weight:400;color:var(--text-secondary);font-size:12px;">合計 ¥${tb}</span></div>
                                 <div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;padding:4px 8px;background:var(--bg-secondary);border-radius:6px;">${modeLabel}</div>
@@ -2998,10 +3863,17 @@ function checkLockOnBoot() {
         }
 
         function escapeHtml(text) { const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
+        function escH(text) { return String(text||'').replace(/[&<>"']/g, function(m) { return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
 
         function formatAIResponse(text) {
             let clean = text.replace(/\[BUDGET_PLAN\][\s\S]*?\[\/BUDGET_PLAN\]/g, '');
-            return clean.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>')
+            // 先轉義 HTML，再將 markdown 語法轉換為安全的 HTML 標籤
+            clean = clean
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            return clean
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
                 .replace(/`(.*?)`/g, '<code style="background:var(--border);padding:2px 6px;border-radius:4px;font-size:12px;">$1</code>')
                 .replace(/### (.*)/g, '<strong style="display:block;margin-top:8px;margin-bottom:4px;">$1</strong>')
                 .replace(/## (.*)/g, '<strong style="display:block;margin-top:10px;margin-bottom:6px;font-size:15px;">$1</strong>')
@@ -3040,7 +3912,7 @@ function checkLockOnBoot() {
             const thisMonth = now.getMonth();
             const thisYear = now.getFullYear();
             const monthKey = `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}`;
-            const monthExpenses = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === thisMonth && d.getFullYear() === thisYear; });
+            const monthExpenses = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === thisMonth && d.getFullYear() === thisYear && !e.isIncome; });
             const totalSpent = monthExpenses.reduce((s, e) => s + e.amount, 0);
             const currentBudget = getBudgetForMonth(monthKey);
             const totalBudget = Object.values(currentBudget).reduce((s, v) => s + v, 0);
@@ -3048,7 +3920,7 @@ function checkLockOnBoot() {
             const categoryBreakdown = {};
             monthExpenses.forEach(e => { categoryBreakdown[e.category] = (categoryBreakdown[e.category] || 0) + e.amount; });
             const last3Months = [];
-            for (let i = 1; i <= 3; i++) { const d = new Date(thisYear, thisMonth - i, 1); const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; const me = expenses.filter(e => e.date.startsWith(mk)); last3Months.push({ month: mk, total: me.reduce((s, e) => s + e.amount, 0) }); }
+            for (let i = 1; i <= 3; i++) { const d = new Date(thisYear, thisMonth - i, 1); const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; const me = expenses.filter(e => e.date.startsWith(mk) && !e.isIncome); last3Months.push({ month: mk, total: me.reduce((s, e) => s + e.amount, 0) }); }
             const daysInMonth = new Date(thisYear, thisMonth + 1, 0).getDate();
             const dayOfMonth = now.getDate();
             const projectedTotal = dayOfMonth > 0 ? (totalSpent / dayOfMonth) * daysInMonth : 0;
@@ -3064,7 +3936,7 @@ function checkLockOnBoot() {
                 prompt += '\n\n' + correctionSummary + '\n';
             }
             prompt += '\n\n【本月支出】\n- 總支出：' + fmt(totalSpent) + '\n- 總預算：' + fmt(totalBudget) + '\n- 剩餘：' + fmt(budgetLeft) + '\n- 執行率：' + (totalBudget > 0 ? (totalSpent/totalBudget*100).toFixed(1) : 0) + '%\n- 預計月末：' + fmt(projectedTotal) + '\n- 已過：' + dayOfMonth + '/' + daysInMonth + '\n\n【分類明細】\n' +
-                Object.entries(categoryBreakdown).sort((a,b)=>b[1]-a[1]).map(([cat, amount]) => { const n = CATEGORIES[cat]?.name || cat; const b = currentBudget[cat] || 0; return '- ' + n + ': ' + fmount.toFixed(2) + ' (預算 ¥' + b + ')'; }).join('\n') + '\n\n【近3月】\n' + last3Months.map(m => '- ' + m.month + ': ¥' + m.total.toFixed(2)).join('\n') + '\n\n【近10筆】\n' + expenses.slice(0,10).map(e => '- ' + e.date + ' ' + (CATEGORIES[e.category]?.name||e.category) + ' ¥' + e.amount.toFixed(2) + ' ' + e.note).join('\n') +
+                Object.entries(categoryBreakdown).sort((a,b)=>b[1]-a[1]).map(([cat, amount]) => { const n = CATEGORIES[cat]?.name || cat; const b = currentBudget[cat] || 0; return '- ' + n + ': ' + fmt(amount) + ' (預算 ' + fmt(b) + ')'; }).join('\n') + '\n\n【近3月】\n' + last3Months.map(m => '- ' + m.month + ': ' + fmt(m.total)).join('\n') + '\n\n【近10筆】\n' + expenses.slice(0,10).map(e => '- ' + e.date + ' ' + (CATEGORIES[e.category]?.name||e.category) + ' ' + fmtWith(e.amount, e.currency || 'MOP') + ' ' + e.note).join('\n') +
                 '\n\n你的職責：回答理財問題，結合預算給建議，提供具體金額，語氣友好專業，Markdown格式，繁體中文。當分配預算時最後附上 [BUDGET_PLAN]JSON區塊，格式如下：\n[BUDGET_PLAN]\n{"mode":"replace","food":2000,"transport":500,...}\n[/BUDGET_PLAN]\n\nmode 規則：\n- 如果用戶說「重新分配」、「從零開始」、「全部重新設定」、「清空舊的」等 → mode="replace"（先清空所有預算再設新值）\n- 如果用戶說「調整某項」、「增加」、「減少」、「在現有基礎上」等 → mode="merge"（保留舊預算，只更新 AI 提到的項目）\n- 鍵名必須用英文（food,transport,shopping,entertainment,housing,medical,education,other），數值為整數\n- replace 模式下，未列出的類別預算設為 0\n\n如果用戶在對話中透露了個人資訊（如職業、收入、城市等），主動建議用戶點擊「📋 更新資料」按鈕更新個人資料，以便未來提供更精準建議。';
             return prompt;
         }
@@ -3179,10 +4051,10 @@ function checkLockOnBoot() {
                         const learned = getLearnedCorrection(item.note, item.category);
                         if (learned) {
                             appliedCount++;
-                            return { ...item, category: learned, note: item.note + ' [🧠自動修正]' };
+                            return { ...item, currency: currentCurrency, category: learned, note: item.note + ' [🧠自動修正]' };
                         }
                     }
-                    return item;
+                    return { ...item, currency: item.currency || currentCurrency };
                 });
                 if (appliedCount > 0) {
                     const statusEl = document.getElementById('ocrStatus');
@@ -3190,7 +4062,7 @@ function checkLockOnBoot() {
                 }
                 showOcrResult(ocrResult);
             } catch (err) {
-                resultDiv.innerHTML = `<div class="screenshot-result"><div style="color:var(--danger);text-align:center;padding:12px;">❌ 識別失敗: ${err.message}</div></div>`;
+                resultDiv.innerHTML = `<div class="screenshot-result"><div style="color:var(--danger);text-align:center;padding:12px;">❌ 識別失敗: ${escapeHtml(String(err.message))}</div></div>`;
             }
         }
 
@@ -3204,8 +4076,9 @@ function checkLockOnBoot() {
         function showOcrResult(items) {
             const resultDiv = document.getElementById('screenshotResult');
             resultDiv.style.display = 'block';
-            const totalExpense = items.filter(i => i.type !== 'income').reduce((s, i) => s + Number(i.amount), 0);
-            const totalIncome = items.filter(i => i.type === 'income').reduce((s, i) => s + Number(i.amount), 0);
+            const totalExpense = items.filter(i => i.type !== 'income').reduce((s, i) => s + inputAmountWith(Number(i.amount), i.currency || currentCurrency), 0);
+            const totalIncome = items.filter(i => i.type === 'income').reduce((s, i) => s + inputAmountWith(Number(i.amount), i.currency || currentCurrency), 0);
+            const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
             let html = `<div class="screenshot-result"><div style="text-align:center;margin-bottom:12px;font-size:14px;color:var(--text-secondary);">✅ 識別到 ${items.length} 筆收支</div>`;
             items.forEach((item, idx) => {
                 const isIncome = item.type === 'income';
@@ -3219,24 +4092,25 @@ function checkLockOnBoot() {
                         <div style="flex:1;">
                             <div style="display:flex;justify-content:space-between;align-items:center;">
                                 <span>${cat.icon} ${cat.name}</span>
-                                <span class="value" style="color:${color};">${sign}${fmt(Number(item.amount))}</span>
+                                <span class="value" style="color:${color};">${sign}${(CURRENCIES[item.currency || currentCurrency] || CURRENCIES["MOP"]).symbol}${Number(item.amount).toFixed(2)}</span>
                             </div>
-                            <div style="font-size:12px;color:var(--text-secondary);">${item.date} · ${item.note || (isIncome ? '收入' : '支出')}</div>
+                            <div style="font-size:12px;color:var(--text-secondary);">${esc(item.date)} · ${esc(item.note || (isIncome ? '收入' : '支出'))}</div>
                         </div>
                     </label>
                     <button onclick="editOcrItem(${idx})" style="background:none;border:none;cursor:pointer;font-size:16px;padding:4px 8px;color:var(--text-secondary);" title="編輯">✏️</button>
                 </div>`;
                 html += `<div id="ocr-edit-${idx}" style="display:none;padding:10px 0;border-bottom:1px solid var(--border);">
                     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:end;">
-                        <div style="flex:1;min-width:80px;"><label style="font-size:11px;color:var(--text-secondary);">金額</label><input type="number" id="ocr-amount-${idx}" value="${item.amount}" step="0.01" min="0" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
+                        <div style="flex:1;min-width:80px;"><label style="font-size:11px;color:var(--text-secondary);">金額</label><input type="number" id="ocr-amount-${idx}" value="${Number(item.amount).toFixed(2)}" step="0.01" min="0" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
+                        <div style="flex:0 0 auto;min-width:70px;"><label style="font-size:11px;color:var(--text-secondary);">幣種</label><select id="ocr-currency-${idx}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"><option value="MOP" ${(item.currency||currentCurrency)==='MOP'?'selected':''}>MOP$</option><option value="CNY" ${(item.currency||currentCurrency)==='CNY'?'selected':''}>¥</option><option value="USD" ${(item.currency||currentCurrency)==='USD'?'selected':''}>US$</option></select></div>
                         <div style="flex:1;min-width:100px;"><label style="font-size:11px;color:var(--text-secondary);">分類</label><select id="ocr-cat-${idx}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);">${buildCategoryOptions(item.category, isIncome)}</select></div>
-                        <div style="flex:1;min-width:120px;"><label style="font-size:11px;color:var(--text-secondary);">日期</label><input type="date" id="ocr-date-${idx}" value="${item.date}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
-                        <div style="flex:2;min-width:100px;"><label style="font-size:11px;color:var(--text-secondary);">備註</label><input type="text" id="ocr-note-${idx}" value="${item.note||''}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
+                        <div style="flex:1;min-width:120px;"><label style="font-size:11px;color:var(--text-secondary);">日期</label><input type="date" id="ocr-date-${idx}" value="${esc(item.date)}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
+                        <div style="flex:2;min-width:100px;"><label style="font-size:11px;color:var(--text-secondary);">備註</label><input type="text" id="ocr-note-${idx}" value="${esc(item.note||'')}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text);"></div>
                         <div style="display:flex;gap:4px;"><button onclick="saveOcrItem(${idx})" style="padding:6px 12px;border-radius:8px;border:none;background:var(--primary);color:white;cursor:pointer;font-size:13px;">✅</button><button onclick="cancelEditOcrItem(${idx})" style="padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--card-bg);color:var(--text);cursor:pointer;font-size:13px;">✕</button></div>
                     </div>
                 </div>`;
             });
-            html += `<div style="display:flex;justify-content:space-between;padding:10px 0 4px;border-top:1px solid var(--border);font-size:13px;"><span>支出: <b style="color:var(--primary)">${fmt(totalExpense.toFixed(2))}</b></span><span>收入: <b style="color:var(--success)">+¥${totalIncome.toFixed(2)}</b></span></div>
+            html += `<div style="display:flex;justify-content:space-between;padding:10px 0 4px;border-top:1px solid var(--border);font-size:13px;"><span>支出: <b style="color:var(--primary)">${fmt(totalExpense.toFixed(2))}</b></span><span>收入: <b style="color:var(--success)">+${fmt(totalIncome.toFixed(2))}</b></span></div>
             <div class="screenshot-actions"><button class="btn btn-primary btn-sm" onclick="applyOcrResult()">✅ 勾選記賬</button><button class="btn btn-secondary btn-sm" onclick="removeScreenshot()">❌ 取消</button></div></div>`;
             resultDiv.innerHTML = html;
         }
@@ -3245,11 +4119,13 @@ function checkLockOnBoot() {
         function cancelEditOcrItem(idx) { document.getElementById('ocr-edit-'+idx).style.display = 'none'; document.getElementById('ocr-view-'+idx).style.display = 'flex'; }
 
         function saveOcrItem(idx) {
+            const ocrCur = document.getElementById('ocr-currency-'+idx).value || 'MOP';
             const amt = parseFloat(document.getElementById('ocr-amount-'+idx).value);
             if (isNaN(amt) || amt <= 0) { showToast('⚠️ 金額必須大於0'); return; }
             const oldCat = ocrResult[idx].category;
             const newCat = document.getElementById('ocr-cat-'+idx).value;
             ocrResult[idx].amount = amt;
+            ocrResult[idx].currency = ocrCur;
             ocrResult[idx].category = newCat;
             ocrResult[idx].date = document.getElementById('ocr-date-'+idx).value;
             ocrResult[idx].note = document.getElementById('ocr-note-'+idx).value;
@@ -3271,7 +4147,7 @@ function checkLockOnBoot() {
                 const isIncome = item.type === 'income';
                 const catMap = isIncome ? INCOME_CATEGORIES : CATEGORIES;
                 const cat = catMap[item.category] ? item.category : (isIncome ? 'other_income' : 'other');
-                expenses.unshift({ id: Date.now() + idx, category: cat, amount: Number(item.amount), date: item.date || new Date().toISOString().split('T')[0], note: (item.note || (isIncome ? '收入' : '截圖記賬')) + (isIncome ? ' [收入]' : ''), isIncome: isIncome });
+                expenses.unshift({ id: Date.now() + idx, category: cat, amount: inputAmountWith(Number(item.amount), item.currency || currentCurrency), date: item.date || new Date().toISOString().split('T')[0], note: (item.note || (isIncome ? '收入' : '截圖記賬')) + (isIncome ? ' [收入]' : ''), isIncome: isIncome, currency: item.currency || currentCurrency });
                 count++;
             });
             if (count === 0) { showToast('⚠️ 請至少勾選一條'); return; }
@@ -3279,17 +4155,142 @@ function checkLockOnBoot() {
             showToast('✅ 已記錄 ' + count + ' 筆收支');
         }
 
+        // ==================== 手機快捷記賬 ====================
+        let quickEntryType = 'expense';
+        let quickCatSelected = '';
+        function toggleQuickAdd() {
+            const m = document.getElementById('quickModal');
+            const fab = document.getElementById('fabBtn');
+            if (m.classList.contains('show')) { closeQuickAdd(); return; }
+            // Init category tags if empty
+            const tagsEl = document.getElementById('quickCategoryTags');
+            if (!tagsEl.children.length) initQuickCategoryTags();
+            // Init currency selector
+            const curSel = document.getElementById('quickCurrency');
+            if (!curSel.children.length) {
+                Object.keys(CURRENCIES).forEach(k => {
+                    const opt = document.createElement('option');
+                    opt.value = k; opt.textContent = CURRENCIES[k].symbol + ' ' + CURRENCIES[k].name;
+                    if (k === currentCurrency) opt.selected = true;
+                    curSel.appendChild(opt);
+                });
+            } else {
+                curSel.value = currentCurrency;
+            }
+            m.classList.add('show');
+            fab.classList.add('open');
+            document.getElementById('quickAmount').focus();
+        }
+        function closeQuickAdd() {
+            document.getElementById('quickModal').classList.remove('show');
+            document.getElementById('fabBtn').classList.remove('open');
+        }
+        
+        function initQuickCategoryTags() {
+            const tagsEl = document.getElementById('quickCategoryTags');
+            tagsEl.innerHTML = '';
+            const catList = quickEntryType === 'income' ? getQuickIncomeCats() : getQuickExpenseCats();
+            const isIncome = quickEntryType === 'income';
+            catList.forEach(cat => {
+                const tag = document.createElement('span');
+                tag.className = 'category-tag';
+                const isCustom = (isIncome ? customIncomeCats : customExpenseCats).some(c => c.key === cat.key);
+                tag.textContent = cat.icon + ' ' + cat.name;
+                tag.onclick = () => {
+                    tagsEl.querySelectorAll('.category-tag').forEach(t => t.classList.remove('active'));
+                    tag.classList.add('active');
+                    quickCatSelected = cat.key;
+                    document.getElementById('quickCategory').value = cat.key;
+                };
+                if (isCustom) {
+                    const del = document.createElement('span');
+                    del.className = 'cat-del';
+                    del.textContent = '✕';
+                    del.style.cssText = 'margin-left:3px;font-size:10px;cursor:pointer;opacity:0.6;';
+                    del.onclick = (e) => { e.stopPropagation(); deleteCustomCat(cat.key); };
+                    tag.appendChild(del);
+                }
+                tagsEl.appendChild(tag);
+            });
+            const addTag = document.createElement('span');
+            addTag.className = 'category-tag cat-add-btn';
+            addTag.style.cssText = 'background:var(--bg-secondary)!important;color:var(--text)!important;cursor:pointer;';
+            addTag.innerHTML = '<span style="font-weight:bold;font-size:16px;">+</span> 自定義';
+            addTag.onclick = () => showAddCustomCat();
+            tagsEl.appendChild(addTag);
+        }
+        
+        function switchQuickType(type) {
+            quickEntryType = type;
+            document.getElementById('quickExpenseBtn').classList.toggle('active', type === 'expense');
+            document.getElementById('quickIncomeBtn').classList.toggle('active', type === 'income');
+            quickCatSelected = '';
+            document.getElementById('quickCategory').value = '';
+            const tagsEl = document.getElementById('quickCategoryTags');
+            tagsEl.innerHTML = '';
+            initQuickCategoryTags();
+        }
+        function submitQuickAdd(e) {
+            e.preventDefault();
+            const isIncome = quickEntryType === 'income';
+            const cat = document.getElementById('quickCategory').value;
+            const amtRaw = document.getElementById('quickAmount').value;
+            const cur = document.getElementById('quickCurrency').value;
+            const note = document.getElementById('quickNote').value.trim();
+            if (!cat) { showToast('請選擇分類'); return; }
+            if (!amtRaw || parseFloat(amtRaw) <= 0) { showToast('請輸入金額'); return; }
+            const amtMop = inputAmountWith(parseFloat(amtRaw), cur);
+            const now = new Date();
+            const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+            const expense = {
+                id: Date.now(),
+                category: cat,
+                amount: amtMop,
+                isIncome: isIncome,
+                currency: cur,
+                date: dateStr,
+                note: note + (isIncome ? ' [收入]' : '')
+            };
+            expenses.push(expense);
+            saveData(); updateAll();
+            // Reset form
+            document.getElementById('quickForm').reset();
+            document.getElementById('quickCategory').value = '';
+            quickCatSelected = '';
+            document.getElementById('quickCategoryTags').querySelectorAll('.category-tag').forEach(t => t.classList.remove('active'));
+            closeQuickAdd();
+            showToast('✅ 已記錄 ' + CURRENCIES[cur].symbol + amtRaw);
+        }
+
         // ==================== 手機端 Tab 切換 ====================
         function switchMobileTab(tabName, btnEl) {
-            if (window.innerWidth > 768) return;
-            document.querySelectorAll('.mobile-section').forEach(s => s.classList.add('mobile-hidden'));
+            // Desktop & mobile: show only the target section
+            document.querySelectorAll('.mobile-section').forEach(s => {
+                s.classList.add('mobile-hidden');
+                s.classList.remove('tab-active');
+            });
             const target = document.getElementById('section-' + tabName);
-            if (target) target.classList.remove('mobile-hidden');
+            if (target) {
+                target.classList.remove('mobile-hidden');
+                target.classList.add('tab-active');
+            }
+            // Update mobile nav active state
             document.querySelectorAll('.mobile-nav-item').forEach(b => b.classList.remove('active'));
-            if (btnEl) btnEl.classList.add('active');
+            if (btnEl && btnEl.classList.contains('mobile-nav-item')) btnEl.classList.add('active');
+            // Update desktop tab active state
+            document.querySelectorAll('.desktop-tab').forEach(b => b.classList.remove('active'));
+            if (btnEl && btnEl.classList.contains('desktop-tab')) btnEl.classList.add('active');
+            // Sync: also update the other nav bar's active state
+            if (window.innerWidth > 768) {
+                const idx = ['add','home','budget','chart','record'].indexOf(tabName);
+                document.querySelectorAll('.mobile-nav-item').forEach((b,i) => b.classList.toggle('active', i===idx));
+            } else {
+                const idx = ['add','home','budget','chart','record'].indexOf(tabName);
+                document.querySelectorAll('.desktop-tab').forEach((b,i) => b.classList.toggle('active', i===idx));
+            }
             window.scrollTo({ top: 0, behavior: 'smooth' });
             if (tabName === 'chart' || tabName === 'home') {
-                setTimeout(() => { if (typeof updateCategoryChart === 'function') updateCategoryChart(); if (typeof updateTrendChart === 'function') updateTrendChart(); }, 100);
+                setTimeout(() => { if (typeof updateCategoryChart === 'function') updateCategoryChart(); if (typeof updateExpenseTrend === 'function') updateExpenseTrend(); if (typeof updateIncomeTrend === 'function') updateIncomeTrend(); }, 100);
             }
         }
 
@@ -3298,16 +4299,29 @@ function checkLockOnBoot() {
             const isMobile = window.innerWidth <= 768;
             if (isMobile !== wasMobile) {
                 wasMobile = isMobile;
-                if (!isMobile) document.querySelectorAll('.mobile-section').forEach(s => s.classList.remove('mobile-hidden'));
-                else {
-                    document.querySelectorAll('.mobile-section').forEach(s => s.classList.add('mobile-hidden'));
-                    const home = document.getElementById('section-home');
-                    if (home) home.classList.remove('mobile-hidden');
-                    document.querySelectorAll('.mobile-nav-item').forEach((b,i) => b.classList.toggle('active', i===0));
-                }
-                setTimeout(() => { if (typeof updateCategoryChart === 'function') updateCategoryChart(); if (typeof updateTrendChart === 'function') updateTrendChart(); }, 150);
+                // Reset to default tab: 記帳 (add)
+                document.querySelectorAll('.mobile-section').forEach(s => {
+                    s.classList.add('mobile-hidden');
+                    s.classList.remove('tab-active');
+                });
+                const add = document.getElementById('section-add');
+                if (add) { add.classList.remove('mobile-hidden'); add.classList.add('tab-active'); }
+                // Sync both nav bars
+                document.querySelectorAll('.mobile-nav-item').forEach((b,i) => b.classList.toggle('active', i===0));
+                document.querySelectorAll('.desktop-tab').forEach((b,i) => b.classList.toggle('active', i===0));
+                setTimeout(() => { if (typeof updateCategoryChart === 'function') updateCategoryChart(); if (typeof updateExpenseTrend === 'function') updateExpenseTrend(); if (typeof updateIncomeTrend === 'function') updateIncomeTrend(); }, 150);
             }
         });
+
+        // Initialize: show default tab on page load
+        (function() {
+            const isMobile = window.innerWidth <= 768;
+            if (!isMobile) {
+                // Desktop: ensure section-add is visible
+                const add = document.getElementById('section-add');
+                if (add) { add.classList.remove('mobile-hidden'); add.classList.add('tab-active'); }
+            }
+        })();
 
         window.onclick = (e) => {
             if (e.target.id === 'budgetModal') closeBudgetModal();
@@ -3322,6 +4336,46 @@ function checkLockOnBoot() {
             setTimeout(() => { t.style.opacity = '0'; }, 2500);
         }
     </script>
+
+<!-- 手機快捷記帳 FAB -->
+<button class="fab-btn" id="fabBtn" onclick="toggleQuickAdd()">＋</button>
+
+<!-- 快捷記帳彈窗 -->
+<div class="quick-modal" id="quickModal" onclick="if(event.target===this)closeQuickAdd()">
+    <div class="quick-sheet">
+        <div class="quick-header">
+            <span class="quick-title">⚡ 快捷記帳</span>
+            <button class="quick-close" onclick="closeQuickAdd()">✕</button>
+        </div>
+        <form id="quickForm" onsubmit="submitQuickAdd(event)">
+            <div class="type-toggle" id="quickTypeToggle">
+                <button type="button" class="type-toggle-btn active" id="quickExpenseBtn" onclick="switchQuickType('expense')">💸 支出</button>
+                <button type="button" class="type-toggle-btn" id="quickIncomeBtn" onclick="switchQuickType('income')">💰 收入</button>
+            </div>
+            <div class="form-group">
+                <label>分類</label>
+                <div class="category-tags" id="quickCategoryTags"></div>
+                <input type="hidden" id="quickCategory" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>金額</label>
+                    <input type="number" id="quickAmount" step="0.01" min="0" placeholder="0.00" required>
+                </div>
+                <div class="form-group">
+                    <label>幣種</label>
+                    <select id="quickCurrency"></select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>備註</label>
+                <input type="text" id="quickNote" placeholder="可選：輸入備註">
+            </div>
+            <button type="submit" class="btn-submit">💾 保存</button>
+        </form>
+    </div>
+</div>
+
 <!-- 安全鎖定畫面 -->
 <div id="lockOverlay">
     <div class="lock-icon">🔒</div>
