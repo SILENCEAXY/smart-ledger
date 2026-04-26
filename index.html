@@ -3921,8 +3921,7 @@ function checkLockOnBoot() {
             const daysInMonth = new Date(thisYear, thisMonth + 1, 0).getDate();
             const dayOfMonth = now.getDate();
             const projectedTotal = dayOfMonth > 0 ? (totalSpent / dayOfMonth) * daysInMonth : 0;
-            let prompt = '你是用戶的個人理財助手。今天日期是：' + now.toLocaleDateString('zh-TW') + '。
-重要日期規則：1) 所有日期必須使用YYYY-MM-DD格式；2) 如果用戶提到「今天」「昨天」「前天」「今日」「昨日」「上週」「上個月」等相對時間詞，必須基於今天日期' + now.toLocaleDateString('zh-TW') + '準確推算；3) 例如用戶說「昨天」= ' + now.toLocaleDateString('zh-TW') + '的前一天。';
+            let prompt = '你是用戶的個人理財助手。今天日期是：' + now.toLocaleDateString('zh-TW') + '。\n重要日期規則：1) 所有日期必須使用YYYY-MM-DD格式；2) 如果用戶提到「今天」「昨天」「前天」「今日」「昨日」「上週」「上個月」等相對時間詞，必須基於今天日期' + now.toLocaleDateString('zh-TW') + '準確推算；3) 例如用戶說「昨天」= ' + now.toLocaleDateString('zh-TW') + '的前一天。';
             const correctionSummary = getCorrectionSummary();
             const profileSummary = getProfileSummary();
             if (profileSummary) {
