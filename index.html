@@ -3451,7 +3451,12 @@ function checkLockOnBoot() {
         function closeBudgetHistoryModal() { document.getElementById('budgetHistoryModal').classList.remove('active'); }
 
         // ==================== 圖表 ====================
-        function updateCharts() { updateCategoryChart(); updateIncomeCategoryChart(); updateExpenseTrend(); updateIncomeTrend(); }
+        function updateCharts() { 
+            try { updateCategoryChart(); } catch(e) { console.error('[charts] categoryChart err:', e.message); }
+            try { updateIncomeCategoryChart(); } catch(e) { console.error('[charts] incomeCategoryChart err:', e.message); }
+            try { updateExpenseTrend(); } catch(e) { console.error('[charts] expenseTrend err:', e.message); }
+            try { updateIncomeTrend(); } catch(e) { console.error('[charts] incomeTrend err:', e.message); }
+        }
 
         function updateCategoryChart() {
             const now = new Date();
