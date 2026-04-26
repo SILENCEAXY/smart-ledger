@@ -3046,11 +3046,16 @@ function checkLockOnBoot() {
             const today = formatDate(now);
             const monthKey = `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}`;
 
+            // 🐛 DEBUG
+            console.log('[DEBUG updateStats] expenses.length=', expenses.length);
+            console.log('[DEBUG updateStats] expenses slice=', expenses.slice(0, 3).map(e=>({id:e.id,cat:e.category,amt:e.amount,date:e.date,income:e.isIncome})));
+
             const monthExpenses = expenses.filter(e => {
                 const d = new Date(e.date);
-                return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+                return d.getMonth() === thisMonth && d.getFullYear() === thisYear && !e.isIncome;
             });
             const monthTotal = monthExpenses.reduce((s, e) => s + e.amount, 0);
+            console.log('[DEBUG updateStats] monthExpenses count=', monthExpenses.length, 'total=', monthTotal);
 
             const lastMonthExpenses = expenses.filter(e => {
                 const d = new Date(e.date);
@@ -4136,7 +4141,11 @@ function checkLockOnBoot() {
                 count++;
             });
             if (count === 0) { showToast('⚠️ 請至少勾選一條'); return; }
-            saveData(); updateAll(); removeScreenshot();
+            saveData();
+            console.log('[DEBUG applyOcr] after saveData, expenses.length=', expenses.length);
+            const ud = getCloudUserData();
+            console.log('[DEBUG applyOcr] cloudData expense count=', ud ? ud.expenses.length : 'N/A');
+            updateAll(); removeScreenshot();
             showToast('✅ 已記錄 ' + count + ' 筆收支');
         }
 
