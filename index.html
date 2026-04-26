@@ -4130,16 +4130,24 @@ function checkLockOnBoot() {
         }
 
         function applyOcrResult() {
+            try {
             if (!ocrResult || !Array.isArray(ocrResult)) return;
             const checks = document.querySelectorAll('.ocr-item-check');
             let count = 0;
             checks.forEach((chk, idx) => {
                 if (!chk.checked) return;
                 const item = ocrResult[idx];
+                console.log('[DEBUG applyOcr] item', idx, 'raw:', JSON.stringify(item));
                 const isIncome = item.type === 'income';
                 const catMap = isIncome ? INCOME_CATEGORIES : CATEGORIES;
                 const cat = catMap[item.category] ? item.category : (isIncome ? 'other_income' : 'other');
-                expenses.unshift({ id: Date.now() + idx, category: cat, amount: inputAmountWith(Number(item.amount), item.currency || currentCurrency), date: item.date || new Date().toISOString().split('T')[0], note: (item.note || (isIncome ? '收入' : '截圖記賬')) + (isIncome ? ' [收入]' : ''), isIncome: isIncome, currency: item.currency || currentCurrency });
+                const rawAmt = Number(item.amount);
+                console.log('[DEBUG applyOcr] rawAmt=', rawAmt, 'isNaN=', isNaN(rawAmt));
+                const convAmt = inputAmountWith(rawAmt, item.currency || currentCurrency);
+                console.log('[DEBUG applyOcr] convAmt=', convAmt);
+                const dateStr = item.date || new Date().toISOString().split('T')[0];
+                console.log('[DEBUG applyOcr] dateStr=', dateStr);
+                expenses.unshift({ id: Date.now() + idx, category: cat, amount: convAmt, date: dateStr, note: (item.note || (isIncome ? '收入' : '截圖記賬')) + (isIncome ? ' [收入]' : ''), isIncome: isIncome, currency: item.currency || currentCurrency });
                 count++;
             });
             if (count === 0) { showToast('⚠️ 請至少勾選一條'); return; }
@@ -4149,6 +4157,7 @@ function checkLockOnBoot() {
             console.log('[DEBUG applyOcr] cloudData expense count=', ud ? ud.expenses.length : 'N/A');
             updateAll(); removeScreenshot();
             showToast('✅ 已記錄 ' + count + ' 筆收支');
+            } catch(e) { console.error('[applyOcrResult ERROR]', e.message, e.stack); showToast('❌ 記賬失敗：' + e.message); }
         }
 
         // ==================== 手機快捷記賬 ====================
