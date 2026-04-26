@@ -956,7 +956,6 @@
                 <button class="header-btn theme-toggle" onclick="toggleTheme()" id="themeBtn">🌙</button>
 
                 <span class="header-btn sync-status" id="syncStatus"></span>
-                <span id="learningBadge" style="font-size:11px;display:none;"></span>
             </div>
         </header>
 
@@ -1472,7 +1471,6 @@
             if (ud.corrections.length > 100) ud.corrections = ud.corrections.slice(0, 100);
 
             syncAfterMutation();
-            updateLearningBadge();
             console.log('🧠 AI學習: ' + originalCategory + ' → ' + correctedCategory + ' ("' + note.substring(0,20) + '")');
         }
 
@@ -1512,18 +1510,6 @@
             const ud = getCloudUserData();
             if (!ud || !Array.isArray(ud.corrections)) return 0;
             return ud.corrections.filter(c => c.count >= 2).length;
-        }
-
-        function updateLearningBadge() {
-            const count = getCorrectionCount();
-            const badge = document.getElementById('learningBadge');
-            if (!badge) return;
-            if (count > 0) {
-                badge.textContent = '🧠' + count;
-                badge.style.display = 'inline';
-            } else {
-                badge.style.display = 'none';
-            }
         }
 
         // ==================== 純 JS SHA-256（file:// 協議相容） ====================
@@ -2769,7 +2755,6 @@ function checkLockOnBoot() {
             renderFilterOptions();
             initRemainMonthSelect();
             updateAll();
-            updateLearningBadge();
         }
 
         // ==================== 數據加載/保存 ====================
