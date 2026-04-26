@@ -3921,7 +3921,7 @@ function checkLockOnBoot() {
             const daysInMonth = new Date(thisYear, thisMonth + 1, 0).getDate();
             const dayOfMonth = now.getDate();
             const projectedTotal = dayOfMonth > 0 ? (totalSpent / dayOfMonth) * daysInMonth : 0;
-            let prompt = '你是用戶的個人理財助手。當前日期：' + now.toLocaleDateString('zh-TW') + '。';
+            let prompt = '你是用戶的個人理財助手。今天日期是：' + now.toLocaleDateString('zh-TW') + '。所有日期必須使用YYYY-MM-DD格式。如果用戶提到"今天""昨天""上週"等相對日期，請基於今天日期' + now.toLocaleDateString('zh-TW') + '推算。';
             const correctionSummary = getCorrectionSummary();
             const profileSummary = getProfileSummary();
             if (profileSummary) {
@@ -4026,7 +4026,7 @@ function checkLockOnBoot() {
                 if (!ocrText || ocrText.length < 2) throw new Error('未能從圖片中識別出文字');
                 if (statusEl) statusEl.textContent = '🤖 AI 正在分析消費信息...';
                 const today = new Date().toISOString().split('T')[0];
-                const systemPrompt = '你是一個收據/賬單識別助手。從截圖OCR提取的文字中提取所有收支條目。繁體中文備註。\n返回JSON格式：{"items":[{"type":"expense或income","amount":數字,"category":"分類key","date":"YYYY-MM-DD","note":"備註"}]}\n注意：items數組，提取所有條目。expense分類：food,transport,shopping,entertainment,housing,medical,education,other。income分類：salary,bonus,refund,investment,transfer,other_income。若無信息返回{"error":"無法識別"}。';
+                const systemPrompt = '你是一個收據/賬單識別助手。從截圖OCR提取的文字中提取所有收支條目。繁體中文備註。\n返回JSON格式：{"items":[{"type":"expense或income","amount":數字,"category":"分類key","date":"YYYY-MM-DD","note":"備註"}]}\n注意：items數組，提取所有條目。expense分類：food,transport,shopping,entertainment,housing,medical,education,other。income分類：salary,bonus,refund,investment,transfer,other_income。\n日期重要規則：1) 如果截圖上有日期，使用截圖上的日期；2) 如果截圖上無日期，使用今天日期：' + today + '；3) 格式必須爲YYYY-MM-DD。若無信息返回{"error":"無法識別"}。';
                 // AI學習：注入用戶修正記錄
                 const ocrCorrectionSummary = getCorrectionSummary();
                 const finalSystemPrompt = ocrCorrectionSummary
@@ -4150,7 +4150,12 @@ function checkLockOnBoot() {
                 console.log('[DEBUG applyOcr] rawAmt=', rawAmt, 'isNaN=', isNaN(rawAmt));
                 const convAmt = inputAmountWith(rawAmt, item.currency || currentCurrency);
                 console.log('[DEBUG applyOcr] convAmt=', convAmt);
-                const dateStr = item.date || new Date().toISOString().split('T')[0];
+                let dateStr = item.date || '';
+                const todayStr = new Date().toISOString().split('T')[0];
+                // AI日期驗證：格式必須是YYYY-MM-DD，不能是未來日期
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr) || dateStr > todayStr) {
+                    dateStr = todayStr;
+                }
                 console.log('[DEBUG applyOcr] dateStr=', dateStr);
                 expenses.unshift({ id: Date.now() + idx, category: cat, amount: convAmt, date: dateStr, note: (item.note || (isIncome ? '收入' : '截圖記賬')) + (isIncome ? ' [收入]' : ''), isIncome: isIncome, currency: item.currency || currentCurrency });
                 count++;
