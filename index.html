@@ -3689,7 +3689,7 @@ function checkLockOnBoot() {
             try {
                 const prompt = buildAIPrompt();
                 const data = await callDeepSeek(
-                    [{ role: 'system', content: '你是一位專業的個人理財顧問。請根據用戶的支出數據，提供簡潔、實用、個性化的省錢建議和消費優化方案。使用繁體中文回覆，格式清晰，每條建議配一個相關emoji。' }, { role: 'user', content: prompt }],
+                    [{ role: 'system', content: '你是一位專業的個人理財顧問。今天日期：' + new Date().toISOString().split('T')[0] + '。請根據用戶的支出數據，提供簡潔、實用、個性化的省錢建議和消費優化方案。使用繁體中文回覆，格式清晰，每條建議配一個相關emoji。重要日期規則：用戶數據中的日期均爲YYYY-MM-DD格式，回覆中提到日期時必須基於今天日期準確推算。' }, { role: 'user', content: prompt }],
                     { temperature: 0.7, max_tokens: 2000 }
                 );
                 displayAIAdvice(data.choices[0].message.content);
@@ -3715,7 +3715,7 @@ function checkLockOnBoot() {
             const daysInMonth = new Date(thisYear, thisMonth + 1, 0).getDate();
             const dayOfMonth = now.getDate();
             const projectedTotal = (totalSpent / dayOfMonth) * daysInMonth;
-            let prompt = '請分析我的本月支出數據並提供個性化理財建議：\n';
+            let prompt = '請分析我的本月支出數據並提供個性化理財建議。今天日期：' + now.toISOString().split('T')[0] + '。\n';
             const correctionSummary = getCorrectionSummary();
             const profileSummary = getProfileSummary();
             if (profileSummary) {
