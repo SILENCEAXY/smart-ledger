@@ -3040,6 +3040,7 @@ function checkLockOnBoot() {
         }
 
         function updateStats() {
+            try {
             const now = new Date();
             const thisMonth = now.getMonth();
             const thisYear = now.getFullYear();
@@ -3048,14 +3049,15 @@ function checkLockOnBoot() {
 
             // 🐛 DEBUG
             console.log('[DEBUG updateStats] expenses.length=', expenses.length);
-            console.log('[DEBUG updateStats] expenses slice=', expenses.slice(0, 3).map(e=>({id:e.id,cat:e.category,amt:e.amount,date:e.date,income:e.isIncome})));
+            console.log('[DEBUG updateStats] expenses slice=', expenses.slice(0, 3).map(function(e){return{id:e.id,cat:e.category,amt:e.amount,date:e.date,income:e.isIncome}}));
 
-            const monthExpenses = expenses.filter(e => {
+            const monthExpenses = expenses.filter(function(e) {
                 const d = new Date(e.date);
                 return d.getMonth() === thisMonth && d.getFullYear() === thisYear && !e.isIncome;
             });
-            const monthTotal = monthExpenses.reduce((s, e) => s + e.amount, 0);
+            const monthTotal = monthExpenses.reduce(function(s, e) { return s + e.amount; }, 0);
             console.log('[DEBUG updateStats] monthExpenses count=', monthExpenses.length, 'total=', monthTotal);
+            } catch(e) { console.error('[updateStats ERROR]', e.message, e.stack); }
 
             const lastMonthExpenses = expenses.filter(e => {
                 const d = new Date(e.date);
