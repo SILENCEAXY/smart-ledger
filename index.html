@@ -3921,7 +3921,8 @@ function checkLockOnBoot() {
             const daysInMonth = new Date(thisYear, thisMonth + 1, 0).getDate();
             const dayOfMonth = now.getDate();
             const projectedTotal = dayOfMonth > 0 ? (totalSpent / dayOfMonth) * daysInMonth : 0;
-            let prompt = '你是用戶的個人理財助手。今天日期是：' + now.toLocaleDateString('zh-TW') + '。所有日期必須使用YYYY-MM-DD格式。如果用戶提到"今天""昨天""上週"等相對日期，請基於今天日期' + now.toLocaleDateString('zh-TW') + '推算。';
+            let prompt = '你是用戶的個人理財助手。今天日期是：' + now.toLocaleDateString('zh-TW') + '。
+重要日期規則：1) 所有日期必須使用YYYY-MM-DD格式；2) 如果用戶提到「今天」「昨天」「前天」「今日」「昨日」「上週」「上個月」等相對時間詞，必須基於今天日期' + now.toLocaleDateString('zh-TW') + '準確推算；3) 例如用戶說「昨天」= ' + now.toLocaleDateString('zh-TW') + '的前一天。';
             const correctionSummary = getCorrectionSummary();
             const profileSummary = getProfileSummary();
             if (profileSummary) {
@@ -4026,7 +4027,7 @@ function checkLockOnBoot() {
                 if (!ocrText || ocrText.length < 2) throw new Error('未能從圖片中識別出文字');
                 if (statusEl) statusEl.textContent = '🤖 AI 正在分析消費信息...';
                 const today = new Date().toISOString().split('T')[0];
-                const systemPrompt = '你是一個收據/賬單識別助手。從截圖OCR提取的文字中提取所有收支條目。繁體中文備註。\n返回JSON格式：{"items":[{"type":"expense或income","amount":數字,"category":"分類key","date":"YYYY-MM-DD","note":"備註"}]}\n注意：items數組，提取所有條目。expense分類：food,transport,shopping,entertainment,housing,medical,education,other。income分類：salary,bonus,refund,investment,transfer,other_income。\n日期重要規則：1) 如果截圖上有日期，使用截圖上的日期；2) 如果截圖上無日期，使用今天日期：' + today + '；3) 格式必須爲YYYY-MM-DD。若無信息返回{"error":"無法識別"}。';
+                const systemPrompt = '你是一個收據/賬單識別助手。從截圖OCR提取的文字中提取所有收支條目。繁體中文備註。\n返回JSON格式：{"items":[{"type":"expense或income","amount":數字,"category":"分類key","date":"YYYY-MM-DD","note":"備註"}]}\n注意：items數組，提取所有條目。expense分類：food,transport,shopping,entertainment,housing,medical,education,other。income分類：salary,bonus,refund,investment,transfer,other_income。\n日期重要規則：1) 截圖上有明確絕對日期（如收據打印日期「2026-04-26」）→ 使用該日期；2) 截圖上只有相對日期文字（「今天」「昨日」「前天」「今早」「昨晚」「上週」等）或完全無日期 → 必須使用今天日期：' + today + '；3) 如果文字是「昨天」，日期就是' + today + '的前一天；「前天」是前兩天，依此類推；4) 格式必須爲YYYY-MM-DD。若無信息返回{"error":"無法識別"}。';
                 // AI學習：注入用戶修正記錄
                 const ocrCorrectionSummary = getCorrectionSummary();
                 const finalSystemPrompt = ocrCorrectionSummary
