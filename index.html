@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能記賬v1.2🔒</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-Z2OVMI3lhCUq9cdF+OcNV8GJj/4w0GHwQZPq5SSf3lBY6h+AlG7lKAmUJRFhN5T" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" integrity="sha384-GJqSu7vueQ9qN0E9yLPb3Wtpd7OrgK8KmYzC8T1IysG1bcvxvIO4qtYR/D3A991F" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" integrity="sha384-ZstPgNL30sIz6Hlxmz87Qsg817okoeAfmzXv89YLICmfsKv3pEdQKOokOL2IpVAS" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --primary: #4f46e5;
@@ -3452,10 +3452,11 @@ function checkLockOnBoot() {
 
         // ==================== 圖表 ====================
         function updateCharts() { 
-            try { updateCategoryChart(); } catch(e) { console.error('[charts] categoryChart err:', e.message); }
-            try { updateIncomeCategoryChart(); } catch(e) { console.error('[charts] incomeCategoryChart err:', e.message); }
-            try { updateExpenseTrend(); } catch(e) { console.error('[charts] expenseTrend err:', e.message); }
-            try { updateIncomeTrend(); } catch(e) { console.error('[charts] incomeTrend err:', e.message); }
+            console.log('[charts] typeof Chart:', typeof Chart);
+            try { updateCategoryChart(); } catch(e) { console.error('[charts] categoryChart err:', e.message, e.stack); }
+            try { updateIncomeCategoryChart(); } catch(e) { console.error('[charts] incomeCategoryChart err:', e.message, e.stack); }
+            try { updateExpenseTrend(); } catch(e) { console.error('[charts] expenseTrend err:', e.message, e.stack); }
+            try { updateIncomeTrend(); } catch(e) { console.error('[charts] incomeTrend err:', e.message, e.stack); }
         }
 
         function updateCategoryChart() {
