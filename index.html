@@ -1431,7 +1431,8 @@
                 window.__cloudData[currentUserId] = {
                     expenses: [], budgets: {default: {food:0,transport:0,shopping:0,entertainment:0,housing:0,medical:0,education:0,other:0}, monthly: {}},
                     budgetHistory: [], chatHistory: [], profile: {},
-                    corrections: []
+                    corrections: [],
+                    customExpenseCats: [], customIncomeCats: []
                 };
             }
             return window.__cloudData[currentUserId];
@@ -1622,7 +1623,9 @@
                     budgetHistory: r.budget_history || [],
                     chatHistory: r.chat_history || [],
                     profile: r.profile || {},
-                    corrections: r.corrections || []
+                    corrections: r.corrections || [],
+                    customExpenseCats: r.custom_expense_cats || [],
+                    customIncomeCats: r.custom_income_cats || []
                 };
             });
             return { accounts, deviceMap, userData };
@@ -1671,6 +1674,8 @@
                         chat_history: v.chatHistory || [],
                         profile: v.profile || {},
                         corrections: v.corrections || [],
+                        custom_expense_cats: v.customExpenseCats || [],
+                        custom_income_cats: v.customIncomeCats || [],
                         updated_at: new Date().toISOString()
                     }]
                 }).catch(e => console.warn('⚠️ user_data upsert失敗:', e.message));
