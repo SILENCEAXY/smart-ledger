@@ -2792,15 +2792,36 @@ function checkLockOnBoot() {
         }
         function loadCustomCats() {
             const ud = getCloudUserData();
+            let loaded = false;
             if (ud) {
-                customExpenseCats = Array.isArray(ud.customExpenseCats) ? ud.customExpenseCats : [];
-                customIncomeCats = Array.isArray(ud.customIncomeCats) ? ud.customIncomeCats : [];
+                if (Array.isArray(ud.customExpenseCats) && Array.isArray(ud.customIncomeCats)) {
+                    customExpenseCats = ud.customExpenseCats;
+                    customIncomeCats = ud.customIncomeCats;
+                    loaded = true;
+                }
+            }
+            // 雲端沒數據時試本機備份
+            if (!loaded && currentUserId) {
+                try {
+                    const raw = localStorage.getItem(CACHE_KEY_PREFIX + '_custom_cats_' + currentUserId);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (parsed && Array.isArray(parsed.exp) && Array.isArray(parsed.inc)) {
+                            customExpenseCats = parsed.exp;
+                            customIncomeCats = parsed.inc;
+                            // 同步回內存數據
+                            if (ud) { ud.customExpenseCats = customExpenseCats; ud.customIncomeCats = customIncomeCats; }
+                        }
+                    }
+                } catch(e){}
             }
             rebuildCustomNameToKey();
         }
         function saveCustomCats() {
             const ud = getCloudUserData();
             if (ud) { ud.customExpenseCats = customExpenseCats; ud.customIncomeCats = customIncomeCats; }
+            // 獨立 localStorage 備份（確保刷新不丟）
+            try { localStorage.setItem(CACHE_KEY_PREFIX + '_custom_cats_' + currentUserId, JSON.stringify({exp: customExpenseCats, inc: customIncomeCats})); } catch(e){}
             saveLocalCache(); syncAfterMutation();
         }
         function showAddCustomCat() {
