@@ -2509,7 +2509,7 @@
                 },
                 body: JSON.stringify({
                     messages,
-                    model: options.model || 'deepseek-chat',
+                    model: options.model || 'deepseek-v4-flash',
                     temperature: options.temperature ?? 0.7,
                     max_tokens: options.max_tokens ?? 2000
                 })
@@ -3719,7 +3719,7 @@ function checkLockOnBoot() {
             try {
                 const prompt = buildAIPrompt();
                 const data = await callDeepSeek(
-                    [{ role: 'system', content: '你是一位專業的個人理財顧問。今天日期：' + new Date().toISOString().split('T')[0] + '。請根據用戶的支出數據，提供簡潔、實用、個性化的省錢建議和消費優化方案。使用繁體中文回覆，格式清晰，每條建議配一個相關emoji。重要日期規則：用戶數據中的日期均爲YYYY-MM-DD格式，回覆中提到日期時必須基於今天日期準確推算。' }, { role: 'user', content: prompt }],
+                    [{ role: 'system', content: '你是一位專業的個人理財顧問，擅長分析消費行為模式。今天日期：' + new Date().toISOString().split('T')[0] + '。請根據用戶的支出數據，深入分析消費行為模式（如工作日vs週末差異、高消費日規律、週別趨勢等），提供簡潔、實用、個性化的省錢建議和消費優化方案。使用繁體中文回覆，格式清晰，每條建議配一個相關emoji。重要日期規則：用戶數據中的日期均爲YYYY-MM-DD格式，回覆中提到日期時必須基於今天日期準確推算。' }, { role: 'user', content: prompt }],
                     { temperature: 0.7, max_tokens: 2000 }
                 );
                 displayAIAdvice(data.choices[0].message.content);
@@ -3754,7 +3754,54 @@ function checkLockOnBoot() {
             if (correctionSummary) {
                 prompt += '\n' + correctionSummary + '\n';
             }
-            prompt += '\n【本月總支出】' + fmt(totalSpent) + '\n【本月總預算】' + fmt(totalBudget) + '\n【預算執行率】' + (totalSpent/totalBudget*100).toFixed(1) + '%\n【上月支出】' + fmt(lastMonthTotal) + '\n【環比變化】' + (lastMonthTotal > 0 ? ((totalSpent-lastMonthTotal)/lastMonthTotal*100).toFixed(1) : 0) + '%\n【預計月末支出】' + fmt(projectedTotal) + '\n\n【分類支出明細】\n' + Object.entries(categoryBreakdown).sort((a,b)=>b[1]-a[1]).map(([cat, amount]) => { const n = CATEGORIES[cat]?.name||cat; const b = currentBudget[cat]||0; return `- ${n}: ${fmt(amount)} (預算 ${fmt(b)}, 執行率 ${b>0?(amount/b*100).toFixed(1):0}%)`; }).join('\n') + '\n\n【最近10筆】\n' + expenses.slice(0, 10).map(e => `- ${e.date} ${CATEGORIES[e.category]?.name||e.category} ${fmt(e.amount)} ${e.note}`).join('\n') + '\n\n請提供以下方面建議：📊支出概況 ⚠️需關注問題 💡省錢建議（具體金額） 📅下月預算優化。繁體中文回覆。';
+            // === 消費行為模式分析 ===
+            const allMonthExpenses = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === thisMonth && d.getFullYear() === thisYear && !e.isIncome; });
+            const weekdaySpending = [0,0,0,0,0]; // Mon-Fri totals
+            const weekendSpending = [0,0]; // Sat-Sun totals
+            const weekdayCount = [0,0,0,0,0];
+            const weekendCount = [0,0];
+            const dailyTotals = {};
+            allMonthExpenses.forEach(e => {
+                const d = new Date(e.date);
+                const dow = d.getDay(); // 0=Sun,1=Mon,...,6=Sat
+                const dayTotal = dailyTotals[e.date] || 0;
+                dailyTotals[e.date] = dayTotal + e.amount;
+                if (dow === 0) { weekendSpending[0] += e.amount; weekendCount[0]++; }
+                else if (dow === 6) { weekendSpending[1] += e.amount; weekendCount[1]++; }
+                else { weekdaySpending[dow-1] += e.amount; weekdayCount[dow-1]++; }
+            });
+            const weekdayTotal = weekdaySpending.reduce((a,b)=>a+b,0);
+            const weekendTotal = weekendSpending.reduce((a,b)=>a+b,0);
+            const weekdayDays = Object.keys(dailyTotals).filter(d => { const dow = new Date(d).getDay(); return dow >= 1 && dow <= 5; }).length;
+            const weekendDays = Object.keys(dailyTotals).filter(d => { const dow = new Date(d).getDay(); return dow === 0 || dow === 6; }).length;
+            const avgWeekday = weekdayDays > 0 ? weekdayTotal / weekdayDays : 0;
+            const avgWeekend = weekendDays > 0 ? weekendTotal / weekendDays : 0;
+            // 高消費日分析
+            const sortedDays = Object.entries(dailyTotals).sort((a,b)=>b[1]-a[1]);
+            const topSpendDays = sortedDays.slice(0,5).map(([d,a]) => { const dow = new Date(d).getDay(); const dayName = ['日','一','二','三','四','五','六'][dow]; return d + '(週' + dayName + ') ' + fmt(a); });
+            // 零消費日
+            const zeroSpendDays = Object.keys(dailyTotals).filter(d => dailyTotals[d] === 0).length;
+            // 連續高消費分析
+            const highSpendThreshold = avgWeekday > 0 ? avgWeekday * 1.5 : 0;
+            const consecutiveHigh = [];
+            let streak = 0;
+            Object.entries(dailyTotals).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([d,a]) => { if (a > highSpendThreshold) { streak++; } else { if (streak >= 2) consecutiveHigh.push(streak + '天'); streak = 0; } });
+            if (streak >= 2) consecutiveHigh.push(streak + '天');
+            // 周別分析
+            const weekAnalysis = [];
+            const weekNums = {};
+            allMonthExpenses.forEach(e => {
+                const d = new Date(e.date);
+                const wn = Math.ceil((d.getDate()) / 7);
+                if (!weekNums[wn]) weekNums[wn] = { total: 0, count: 0 };
+                weekNums[wn].total += e.amount;
+                weekNums[wn].count++;
+            });
+            for (const [wn, data] of Object.entries(weekNums).sort((a,b)=>a[0]-b[0])) {
+                weekAnalysis.push('第' + wn + '週: ' + fmt(data.total) + ' (' + data.count + '筆)');
+            }
+
+            prompt += '\n【本月總支出】' + fmt(totalSpent) + '\n【本月總預算】' + fmt(totalBudget) + '\n【預算執行率】' + (totalSpent/totalBudget*100).toFixed(1) + '%\n【上月支出】' + fmt(lastMonthTotal) + '\n【環比變化】' + (lastMonthTotal > 0 ? ((totalSpent-lastMonthTotal)/lastMonthTotal*100).toFixed(1) : 0) + '%\n【預計月末支出】' + fmt(projectedTotal) + '\n\n【分類支出明細】\n' + Object.entries(categoryBreakdown).sort((a,b)=>b[1]-a[1]).map(([cat, amount]) => { const n = CATEGORIES[cat]?.name||cat; const b = currentBudget[cat]||0; return `- ${n}: ${fmt(amount)} (預算 ${fmt(b)}, 執行率 ${b>0?(amount/b*100).toFixed(1):0}%)`; }).join('\n') + '\n\n【消費行為模式分析】\n- 工作日日均消費：' + fmt(avgWeekday) + '（共' + weekdayDays + '天有消費，總計' + fmt(weekdayTotal) + '）\n- 週末日均消費：' + fmt(avgWeekend) + '（共' + weekendDays + '天有消費，總計' + fmt(weekendTotal) + '）\n- 週末vs工作日差異：' + (avgWeekday > 0 ? ((avgWeekend - avgWeekday) / avgWeekday * 100).toFixed(1) : 0) + '%\n- 零消費天數：' + zeroSpendDays + '天\n- 高消費日TOP5：' + topSpendDays.join('、') + '\n' + (consecutiveHigh.length > 0 ? '- 連續超額消費：最長' + consecutiveHigh.join('、') + '\n' : '') + '\n【週別支出】\n' + weekAnalysis.join('\n') + '\n\n【最近10筆】\n' + expenses.slice(0, 10).map(e => `- ${e.date} ${CATEGORIES[e.category]?.name||e.category} ${fmt(e.amount)} ${e.note}`).join('\n') + '\n\n請提供以下方面建議：📊支出概況（含工作日/週末消費差異分析） ⚠️需關注問題（含消費模式風險） 💡省錢建議（具體金額，針對消費模式） 📅下月預算優化（區分工作日/週末預算）。繁體中文回覆。';
             return prompt;
         }
 
@@ -3951,7 +3998,7 @@ function checkLockOnBoot() {
             const daysInMonth = new Date(thisYear, thisMonth + 1, 0).getDate();
             const dayOfMonth = now.getDate();
             const projectedTotal = dayOfMonth > 0 ? (totalSpent / dayOfMonth) * daysInMonth : 0;
-            let prompt = '你是用戶的個人理財助手。今天日期是：' + now.toLocaleDateString('zh-TW') + '。\n重要日期規則：1) 所有日期必須使用YYYY-MM-DD格式；2) 如果用戶提到「今天」「昨天」「前天」「今日」「昨日」「上週」「上個月」等相對時間詞，必須基於今天日期' + now.toLocaleDateString('zh-TW') + '準確推算；3) 例如用戶說「昨天」= ' + now.toLocaleDateString('zh-TW') + '的前一天。';
+            let prompt = '你是用戶的個人理財助手，擅長分析消費行為模式並提供數據驅動的建議。今天日期是：' + now.toLocaleDateString('zh-TW') + '。\n重要日期規則：1) 所有日期必須使用YYYY-MM-DD格式；2) 如果用戶提到「今天」「昨天」「前天」「今日」「昨日」「上週」「上個月」等相對時間詞，必須基於今天日期' + now.toLocaleDateString('zh-TW') + '準確推算；3) 例如用戶說「昨天」= ' + now.toLocaleDateString('zh-TW') + '的前一天。';
             const correctionSummary = getCorrectionSummary();
             const profileSummary = getProfileSummary();
             if (profileSummary) {
@@ -3962,9 +4009,40 @@ function checkLockOnBoot() {
             if (correctionSummary) {
                 prompt += '\n\n' + correctionSummary + '\n';
             }
+            // === 消費行為模式分析 ===
+            const allChatMonthExpenses = expenses.filter(e => { const d = new Date(e.date); return d.getMonth() === thisMonth && d.getFullYear() === thisYear && !e.isIncome; });
+            const chatWeekdaySpending = [0,0,0,0,0];
+            const chatWeekendSpending = [0,0];
+            const chatDailyTotals = {};
+            allChatMonthExpenses.forEach(e => {
+                const d = new Date(e.date);
+                const dow = d.getDay();
+                const dayTotal = chatDailyTotals[e.date] || 0;
+                chatDailyTotals[e.date] = dayTotal + e.amount;
+                if (dow === 0) { chatWeekendSpending[0] += e.amount; }
+                else if (dow === 6) { chatWeekendSpending[1] += e.amount; }
+                else { chatWeekdaySpending[dow-1] += e.amount; }
+            });
+            const chatWeekdayTotal = chatWeekdaySpending.reduce((a,b)=>a+b,0);
+            const chatWeekendTotal = chatWeekendSpending.reduce((a,b)=>a+b,0);
+            const chatWeekdayDays = Object.keys(chatDailyTotals).filter(d => { const dow = new Date(d).getDay(); return dow >= 1 && dow <= 5; }).length;
+            const chatWeekendDays = Object.keys(chatDailyTotals).filter(d => { const dow = new Date(d).getDay(); return dow === 0 || dow === 6; }).length;
+            const chatAvgWeekday = chatWeekdayDays > 0 ? chatWeekdayTotal / chatWeekdayDays : 0;
+            const chatAvgWeekend = chatWeekendDays > 0 ? chatWeekendTotal / chatWeekendDays : 0;
+            const chatTopSpendDays = Object.entries(chatDailyTotals).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([d,a]) => { const dow = new Date(d).getDay(); const dayName = ['日','一','二','三','四','五','六'][dow]; return d + '(週' + dayName + ') ' + fmt(a); });
+            const chatWeekNums = {};
+            allChatMonthExpenses.forEach(e => {
+                const d = new Date(e.date);
+                const wn = Math.ceil(d.getDate() / 7);
+                if (!chatWeekNums[wn]) chatWeekNums[wn] = { total: 0, count: 0 };
+                chatWeekNums[wn].total += e.amount;
+                chatWeekNums[wn].count++;
+            });
+            const chatWeekAnalysis = Object.entries(chatWeekNums).sort((a,b)=>a[0]-b[0]).map(([wn, data]) => '第' + wn + '週: ' + fmt(data.total) + ' (' + data.count + '筆)').join('\n');
+
             prompt += '\n\n【本月支出】\n- 總支出：' + fmt(totalSpent) + '\n- 總預算：' + fmt(totalBudget) + '\n- 剩餘：' + fmt(budgetLeft) + '\n- 執行率：' + (totalBudget > 0 ? (totalSpent/totalBudget*100).toFixed(1) : 0) + '%\n- 預計月末：' + fmt(projectedTotal) + '\n- 已過：' + dayOfMonth + '/' + daysInMonth + '\n\n【分類明細】\n' +
-                Object.entries(categoryBreakdown).sort((a,b)=>b[1]-a[1]).map(([cat, amount]) => { const n = CATEGORIES[cat]?.name || cat; const b = currentBudget[cat] || 0; return '- ' + n + ': ' + fmt(amount) + ' (預算 ' + fmt(b) + ')'; }).join('\n') + '\n\n【近3月】\n' + last3Months.map(m => '- ' + m.month + ': ' + fmt(m.total)).join('\n') + '\n\n【近10筆】\n' + expenses.slice(0,10).map(e => '- ' + e.date + ' ' + (CATEGORIES[e.category]?.name||e.category) + ' ' + fmtWith(e.amount, e.currency || 'MOP') + ' ' + e.note).join('\n') +
-                '\n\n你的職責：回答理財問題，結合預算給建議，提供具體金額，語氣友好專業，Markdown格式，繁體中文。當分配預算時最後附上 [BUDGET_PLAN]JSON區塊，格式如下：\n[BUDGET_PLAN]\n{"mode":"replace","food":2000,"transport":500,...}\n[/BUDGET_PLAN]\n\nmode 規則：\n- 如果用戶說「重新分配」、「從零開始」、「全部重新設定」、「清空舊的」等 → mode="replace"（先清空所有預算再設新值）\n- 如果用戶說「調整某項」、「增加」、「減少」、「在現有基礎上」等 → mode="merge"（保留舊預算，只更新 AI 提到的項目）\n- 鍵名必須用英文（food,transport,shopping,entertainment,housing,medical,education,other），數值為整數\n- replace 模式下，未列出的類別預算設為 0\n\n如果用戶在對話中透露了個人資訊（如職業、收入、城市等），主動建議用戶點擊「📋 更新資料」按鈕更新個人資料，以便未來提供更精準建議。';
+                Object.entries(categoryBreakdown).sort((a,b)=>b[1]-a[1]).map(([cat, amount]) => { const n = CATEGORIES[cat]?.name || cat; const b = currentBudget[cat] || 0; return '- ' + n + ': ' + fmt(amount) + ' (預算 ' + fmt(b) + ')'; }).join('\n') + '\n\n【消費行為模式】\n- 工作日日均：' + fmt(chatAvgWeekday) + '（' + chatWeekdayDays + '天）\n- 週末日均：' + fmt(chatAvgWeekend) + '（' + chatWeekendDays + '天）\n- 週末vs工作日：' + (chatAvgWeekday > 0 ? ((chatAvgWeekend - chatAvgWeekday) / chatAvgWeekday * 100).toFixed(1) : 0) + '%\n- 高消費日：' + chatTopSpendDays.join('、') + '\n\n【週別支出】\n' + chatWeekAnalysis + '\n\n【近3月】\n' + last3Months.map(m => '- ' + m.month + ': ' + fmt(m.total)).join('\n') + '\n\n【近10筆】\n' + expenses.slice(0,10).map(e => '- ' + e.date + ' ' + (CATEGORIES[e.category]?.name||e.category) + ' ' + fmtWith(e.amount, e.currency || 'MOP') + ' ' + e.note).join('\n') +
+                '\n\n你的職責：作為智能理財助手，你不僅回答問題，更要主動分析用戶的消費行為模式（如工作日vs週末消費差異、高消費日規律、週別趨勢等），並基於這些模式提供數據驅動的個性化建議。回答理財問題時結合預算給建議，提供具體金額，語氣友好專業，Markdown格式，繁體中文。當分配預算時最後附上 [BUDGET_PLAN]JSON區塊，格式如下：\n[BUDGET_PLAN]\n{"mode":"replace","food":2000,"transport":500,...}\n[/BUDGET_PLAN]\n\nmode 規則：\n- 如果用戶說「重新分配」、「從零開始」、「全部重新設定」、「清空舊的」等 → mode="replace"（先清空所有預算再設新值）\n- 如果用戶說「調整某項」、「增加」、「減少」、「在現有基礎上」等 → mode="merge"（保留舊預算，只更新 AI 提到的項目）\n- 鍵名必須用英文（food,transport,shopping,entertainment,housing,medical,education,other），數值為整數\n- replace 模式下，未列出的類別預算設為 0\n\n如果用戶在對話中透露了個人資訊（如職業、收入、城市等），主動建議用戶點擊「📋 更新資料」按鈕更新個人資料，以便未來提供更精準建議。';
             return prompt;
         }
 
