@@ -837,7 +837,7 @@
             .expense-meta { font-size: 11px; }
             .expense-amount { font-size: 14px; }
             .form-group input, .form-group select { padding: 10px 10px; font-size: 14px; }
-            .form-group input[type="date"] { padding: 10px 10px; font-size: 14px; height: auto; box-sizing: border-box; }
+            .form-group input[type="date"] { padding: 10px 10px; font-size: 14px; height: auto; box-sizing: border-box; max-width: 100%; -webkit-appearance: none; appearance: none; }
         }
 
         @media (max-width: 768px) {
@@ -854,6 +854,7 @@
         @media (hover: none) and (pointer: coarse) {
             .btn, select, input { min-height: 40px; }
             select, input[type="text"], input[type="number"], input[type="date"], input[type="password"] { font-size: 16px; }
+            input[type="date"] { width: 100%; box-sizing: border-box; }
         }
         @media (max-width: 480px) {
             .login-box { padding: 24px 16px; }
@@ -1137,22 +1138,6 @@
 
         <div class="card" style="margin-bottom:20px;">
             <div class="card-header">
-                <span class="card-title">🤖 AI 智能建議</span>
-                <div style="display:flex;gap:8px;">
-                    <button class="btn btn-primary btn-sm" onclick="getAIAdvice()" id="aiBtn">✨ 獲取建議</button>
-                </div>
-            </div>
-
-            <div id="aiContent">
-                <div class="empty-state">
-                    <div class="icon">🤖</div>
-                    <div>點擊「獲取建議」按鈕，AI 將分析您的支出數據並提供個性化理財建議</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card" style="margin-bottom:20px;">
-            <div class="card-header">
                 <span class="card-title">💬 AI 對話助手</span>
                 <button class="btn btn-secondary btn-sm" onclick="clearChat()">🗑️ 清空</button>
             </div>
@@ -1174,6 +1159,22 @@
                 <div class="chat-input-area">
                     <input type="text" id="chatInput" placeholder="輸入您的問題或計劃..." onkeydown="if(event.key==='Enter')sendChat()">
                     <button onclick="sendChat()" id="chatSendBtn">發送</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-bottom:20px;">
+            <div class="card-header">
+                <span class="card-title">🤖 AI 智能建議</span>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-primary btn-sm" onclick="getAIAdvice()" id="aiBtn">✨ 獲取建議</button>
+                </div>
+            </div>
+
+            <div id="aiContent">
+                <div class="empty-state">
+                    <div class="icon">🤖</div>
+                    <div>點擊「獲取建議」按鈕，AI 將分析您的支出數據並提供個性化理財建議</div>
                 </div>
             </div>
         </div>
