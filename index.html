@@ -763,10 +763,10 @@
             .container { padding: 10px 12px; padding-bottom: 80px; }
             header { flex-wrap: wrap; }
             h1 { font-size: 20px; }
-            .header-left { flex-wrap: wrap; width: 100%; min-width: 0; }
-            .header-left h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+            .header-left { flex-wrap: nowrap; width: 100%; min-width: 0; align-items: baseline; gap: 8px; }
+            .header-left h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; min-width: 0; }
             .header-left .security-text { margin-left: 0 !important; width: 100%; font-size: 10px; white-space: normal !important; line-height: 1.3; }
-            .header-left .design-by { width: 100%; font-size: 9px; order: 1; text-align: left; }
+            .header-left .design-by { width: auto; font-size: 9px; flex-shrink: 0; }
             .header-actions { width: 100%; gap: 6px; flex-wrap: nowrap; justify-content: flex-end; }
             .header-actions .btn-secondary { display: none; }
             .btn-sm { padding: 6px 10px; font-size: 12px; }
@@ -809,9 +809,9 @@
             .container { padding: 8px 10px; padding-bottom: 76px; }
             header { flex-wrap: wrap; }
             h1 { font-size: 18px; }
-            .header-left { flex-wrap: wrap; width: 100%; min-width: 0; }
-            .header-left h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
-            .design-by { display: block; width: 100%; font-size: 9px; order: 1; text-align: left; }
+            .header-left { flex-wrap: nowrap; width: 100%; min-width: 0; align-items: baseline; gap: 6px; }
+            .header-left h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; min-width: 0; }
+            .design-by { width: auto; font-size: 9px; flex-shrink: 0; }
             .header-left .security-text { display: block; margin-left: 0 !important; width: 100%; font-size: 9px; white-space: normal !important; line-height: 1.3; order: 2; }
             .header-actions { width: 100%; gap: 4px; flex-wrap: nowrap; justify-content: flex-end; }
             .header-actions .btn-secondary { display: none; }
